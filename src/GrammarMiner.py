@@ -514,7 +514,54 @@ if __name__ == "__main__":
     assert tree_to_string(tree) == str(tracer.inputstr)
 
 
-from Parser import VAR_GRAMMAR, VAR_TOKENS, canonical
+#from Parser import VAR_GRAMMAR, VAR_TOKENS, canonical
+
+
+def crange(character_start, character_end):
+    return [chr(i)
+            for i in range(ord(character_start), ord(character_end) + 1)]
+VAR_GRAMMAR = {
+    '<start>': ['<statements>'],
+    '<statements>': ['<statement>;<statements>', '<statement>'],
+    '<statement>': ['<assignment>'],
+    '<assignment>': ['<identifier>=<expr>'],
+    '<identifier>': ['<word>'],
+    '<word>': ['<alpha><word>', '<alpha>'],
+    '<alpha>': list(string.ascii_letters),
+    '<expr>': ['<term>+<expr>', '<term>-<expr>', '<term>'],
+    '<term>': ['<factor>*<term>', '<factor>/<term>', '<factor>'],
+    '<factor>':
+    ['+<factor>', '-<factor>', '(<expr>)', '<identifier>', '<number>'],
+    '<number>': ['<integer>.<integer>', '<integer>'],
+    '<integer>': ['<digit><integer>', '<digit>'],
+    '<digit>': crange('0', '9')
+}
+VAR_TOKENS = {'<number>', '<identifier>'}
+
+
+def canonical(grammar, letters=False):
+    def split(expansion):
+        if isinstance(expansion, tuple):
+            expansion = expansion[0]
+
+        return [token for token in re.split(RE_NONTERMINAL, expansion) if token]
+
+    def tokenize(word):
+        return list(word) if letters else [word]
+
+    def canonical_expr(expression):
+        return [
+            token for word in split(expression)
+            for token in ([word] if word in grammar else tokenize(word))
+        ]
+
+    return {
+        k: [canonical_expr(expression) for expression in alternatives]
+        for k, alternatives in grammar.items()
+    }
+
+
+
 
 if __name__ == "__main__":
     mystring = 'a=1'

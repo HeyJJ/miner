@@ -1,24 +1,11 @@
 #!/usr/bin/env python3
+
 import inspect
 import enum
-def substrings(s, l):
-    for i in range(len(s) - (l - 1)):
-        yield s[i:i + l]
 
-
-class tstr_iterator():
-    def __init__(self, tstr):
-        self._tstr = tstr
-        self._str_idx = 0
-
-    def __next__(self):
-        if self._str_idx == len(self._tstr):
-            raise StopIteration
-        # calls tstr getitem should be tstr
-        c = self._tstr[self._str_idx]
-        assert isinstance(c, tstr)
-        self._str_idx += 1
-        return c
+def my_calculator(my_input):
+    result = eval(my_input, {}, {})
+    print("The result of %s was %d" % (my_input, result))
 
 
 class tstr_(str):
@@ -41,6 +28,7 @@ class tstr(tstr_):
     def __str__(self):
         return str.__str__(self)
 
+class tstr(tstr):
     def untaint(self):
         self.taint = [None] * len(self)
         return self
@@ -51,9 +39,15 @@ class tstr(tstr_):
     def taint_in(self, gsentence):
         return set(self.taint) <= set(gsentence.taint)
 
+
+
+class tstr(tstr):
     def create(self, res, taint):
         return tstr(res, taint, self)
 
+
+
+class tstr(tstr):
     def __getitem__(self, key):
         res = super().__getitem__(key)
         if isinstance(key, int):
@@ -64,9 +58,25 @@ class tstr(tstr_):
         else:
             assert False
 
+class tstr(tstr):
     def __iter__(self):
         return tstr_iterator(self)
 
+class tstr_iterator():
+    def __init__(self, tstr):
+        self._tstr = tstr
+        self._str_idx = 0
+
+    def __next__(self):
+        if self._str_idx == len(self._tstr):
+            raise StopIteration
+        # calls tstr getitem should be tstr
+        c = self._tstr[self._str_idx]
+        assert isinstance(c, tstr)
+        self._str_idx += 1
+        return c
+
+class tstr(tstr):
     def __add__(self, other):
         if isinstance(other, tstr):
             return self.create(str.__add__(self, other),
@@ -75,11 +85,13 @@ class tstr(tstr_):
             return self.create(str.__add__(self, other),
                                (self.taint + [-1 for i in other]))
 
+class tstr(tstr):
     def __radd__(self, other):
         taint = other.taint if isinstance(other, tstr) else [
             None for i in other]
         return self.create(str.__add__(other, self), (taint + self.taint))
 
+class tstr(tstr):
     class TaintException(Exception):
         pass
 
@@ -94,6 +106,7 @@ class tstr(tstr_):
             return [self[p]
                     for p in [k for k, j in enumerate(self.taint) if j in r]]
 
+class tstr(tstr):
     def replace(self, a, b, n=None):
         old_taint = self.taint
         b_taint = b.taint if isinstance(b, tstr) else [None] * len(b)
@@ -112,6 +125,7 @@ class tstr(tstr_):
             i += 1
         return self.create(mystr, old_taint)
 
+class tstr(tstr):
     def _split_helper(self, sep, splitted):
         result_list = []
         last_idx = 0
@@ -151,6 +165,7 @@ class tstr(tstr_):
             return self._split_space(splitted)
         return self._split_helper(sep, splitted)
 
+class tstr(tstr):
     def strip(self, cl=None):
         return self.lstrip(cl).rstrip(cl)
 
@@ -163,6 +178,8 @@ class tstr(tstr_):
         res = super().rstrip(cl)
         return self[0:len(res)]
 
+
+class tstr(tstr):
     def expandtabs(self, n=8):
         parts = self.split('\t')
         res = super().expandtabs(n)
@@ -174,6 +191,7 @@ class tstr(tstr_):
                 all_parts.extend([p.taint[-1]] * l)
         return self.create(res, all_parts)
 
+class tstr(tstr):
     def join(self, iterable):
         mystr = ''
         mytaint = []
@@ -190,6 +208,7 @@ class tstr(tstr_):
         assert len(res) == len(mystr)
         return self.create(res, mytaint)
 
+class tstr(tstr):
     def partition(self, sep):
         partA, sep, partB = super().partition(sep)
         return (self.create(partA, self.taint[0:len(partA)]),
@@ -202,6 +221,7 @@ class tstr(tstr_):
                 self.create(sep, self.taint[len(partA):len(partA) + len(sep)]),
                 self.create(partB, self.taint[len(partA) + len(sep):]))
 
+class tstr(tstr):
     def ljust(self, width, fillchar=' '):
         res = super().ljust(width, fillchar)
         initial = len(res) - len(self)
@@ -220,6 +240,7 @@ class tstr(tstr_):
             t = -1
         return self.create(res, self.taint + [t] * final)
 
+class tstr(tstr):
     def swapcase(self):
         return self.create(str(self).swapcase(), self.taint)
 
@@ -234,7 +255,6 @@ class tstr(tstr_):
 
     def title(self):
         return self.create(str(self).title(), self.taint)
-
 
 def taint_include(gword, gsentence):
     return set(gword.taint) <= set(gsentence.taint)
@@ -255,19 +275,12 @@ for name, fn in inspect.getmembers(str, callable):
                         '__repr__', '__getattribute__']) | set(tstr_members):
         setattr(tstr, name, make_str_wrapper(fn))
 
-# ### Methods yet to be translated
-
 
 def make_str_abort_wrapper(fun):
     def proxy(*args, **kwargs):
         raise tstr.TaintException('%s Not implemented in TSTR' % fun.__name__)
     return proxy
 
-if __name__ == "__main__":
-    for name, fn in inspect.getmembers(str, callable):
-        if name in ['__format__', '__rmod__', '__mod__', 'format_map', 'format',
-                    '__mul__', '__rmul__', 'center', 'zfill', 'decode', 'encode', 'splitlines']:
-            setattr(tstr, name, make_str_abort_wrapper(fn))
 
 
 class eoftstr(tstr):
@@ -313,6 +326,7 @@ class eoftstr(tstr):
         else:
             assert False
 
+class eoftstr(eoftstr):
     def t(self, i=0):
         if self.taint:
             return self.taint[i]
@@ -345,6 +359,8 @@ COMPARE_OPERATORS = {
 }
 
 Comparisons = []
+
+# ### Instructions
 
 class Instr:
     def __init__(self, o, a, b):
@@ -401,6 +417,7 @@ class Instr:
         else:
             assert False
 
+
 class ctstr(eoftstr):
     def create(self, res, taint):
         o = ctstr(res, taint, self)
@@ -414,6 +431,7 @@ class ctstr(eoftstr):
         self.comparisons = comparisons
         return self
 
+class ctstr(ctstr):
     def __eq__(self, other):
         if len(self) == 0 and len(other) == 0:
             self.add_instr(Op.EQ, self, other)
@@ -432,13 +450,16 @@ class ctstr(eoftstr):
                 return False
             return self[1:] == other[1:]
 
+class ctstr(ctstr):
     def __ne__(self, other):
         return not self.__eq__(other)
 
+class ctstr(ctstr):
     def __contains__(self, other):
         self.add_instr(Op.IN, self, other)
         return super().__contains__(other)
 
+class ctstr(ctstr):
     def find(self, sub, start=None, end=None):
         if start is None:
             start_val = 0
@@ -447,6 +468,19 @@ class ctstr(eoftstr):
         self.add_instr(Op.IN, self[start_val:end_val], sub)
         return super().find(sub, start, end)
 
+class ctstr(ctstr):
+    def startswith(self, s, beg =0,end=None):
+        if end == None:
+            end = len(self)
+        self == s[beg:end]
+        return super().startswith(s, beg, end)
+
+
+def substrings(s, l):
+    for i in range(len(s) - (l - 1)):
+        yield s[i:i + l]
+
+class ctstr(ctstr):
     def in_(self, s):
         if isinstance(s, str):
             # c in '0123456789'
@@ -468,6 +502,10 @@ def my_fn(c, s):
         return s
 
 import ast
+import inspect
+
+# #### Get the source code
+
 
 class InRewrite(ast.NodeTransformer):
     def visit_Compare(self, tree_node):
@@ -490,5 +528,4 @@ def rewrite_in(fn, log=False):
         import astunparse
         print(astunparse.unparse(p))
     return compile(p, filename='', mode='exec')
-
 
