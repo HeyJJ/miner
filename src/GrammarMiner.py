@@ -1,225 +1,6 @@
 #!/usr/bin/env python3
 import sys
-def traceit(frame, event, arg):
-    method_name = frame.f_code.co_name
-    if method_name != "process_vehicle":
-        return
-    file_name = frame.f_code.co_filename
-    param_names = [frame.f_code.co_varnames[i] for i in range(frame.f_code.co_argcount)]
-    print(event, file_name, method_name, param_names, frame.f_locals)
-    return traceit
-
-class Context:
-    def __init__(self, frame, track_caller=True):
-        self.method = self._method(frame)
-        self.parameter_names = self._get_parameters(frame)
-        self.file_name = self._file_name(frame)
-        self.parent = Context(frame.f_back,
-                              False) if track_caller and frame.f_back else None
-
-    def _get_parameters(self, frame):
-        return [
-            frame.f_code.co_varnames[i]
-            for i in range(frame.f_code.co_argcount)
-        ]
-
-    def _file_name(self, frame):
-        return frame.f_code.co_filename
-    
-    def _method(self, frame):
-        return frame.f_code.co_name
-
-    def all_vars(self, frame):
-        return frame.f_locals
-    
-    def __repr__(self):
-        return "%s:%s(%s)" % (self.file_name, self.method, ','.join(self.parameter_names))
-
-class Tracer:
-    def __enter__(self):
-        self.oldtrace = sys.gettrace()
-        sys.settrace(self.trace_event)
-        return self
-
-    def __exit__(self, *args):
-        sys.settrace(self.oldtrace)
-
-    def trace_event(self, frame, event, arg):
-        method_name = frame.f_code.co_name
-        if method_name != "process_vehicle":
-            return
-        file_name = frame.f_code.co_filename
-        param_names = [
-            frame.f_code.co_varnames[i]
-            for i in range(frame.f_code.co_argcount)
-        ]
-        print(event, file_name, method_name, param_names, frame.f_locals)
-        return self.trace_event
-
-    def __init__(self, inputstr, files=[]):
-        self.inputstr, self.files, self.trace = inputstr, files, []
-
-    def tracing_var(self, k, v):
-        return isinstance(v, str)
-
-    def tracing_context(self, cxt, event, arg):
-        if not self.files:
-            return True
-        return any(cxt.file_name.endswith(f) for f in self.files)
-
-    def on_event(self, event, arg, cxt, my_vars):
-        self.trace.append((event, arg, cxt, my_vars))
-
-    def trace_event(self, frame, event, arg):
-        cxt = Context(frame)
-        if not self.tracing_context(cxt, event, arg):
-            return self.trace_event
-
-        my_vars = [(k, v) for k, v in cxt.all_vars(frame).items()
-                   if self.tracing_var(k, v)]
-        self.on_event(event, arg, cxt, my_vars)
-        return self.trace_event
-
-    def __call__(self):
-        return self.inputstr
-
-LOOKAHEAD_LEN=2
-START_SYMBOL = '<start>'
-
 import re
-RE_NONTERMINAL = re.compile(r'(<[^<> ]*>)')
-def is_nonterminal(s):
-    return re.match(RE_NONTERMINAL, s)
-
-def tree_to_string(tree):
-    symbol, children, *_ = tree
-    if children:
-        return ''.join(tree_to_string(c) for c in children)
-    else:
-        return '' if is_nonterminal(symbol) else symbol
-
-class Infer:
-    def __init__(self):
-        self.grammar = {}
-
-class Infer(Infer):
-    def add_tree(self, t):
-        merged_grammar = {}
-        for key in list(self.grammar.keys()) + list(t.tree.keys()):
-            alternates = set(self.grammar.get(key, []))
-            if key in t.tree:
-                alternates.add(''.join(t.tree[key]))
-            merged_grammar[key] = list(alternates)
-        self.grammar = merged_grammar
-
-URLS = [
-        'http://user:pass@www.google.com:80/?q=path#ref',
-        'https://www.cispa.saarland:80/',
-        'http://www.fuzzingbook.org/#News',
-        ]
-URLS_X = URLS + ['ftp://freebsd.org/releases/5.8']
-from urllib.parse import urlparse, clear_cache
-
-# ## Tainted Miner
-from InformationFlow import tstr, ctstr, rewrite_in, Instr
-
-CURRENT_METHOD = None
-
-def get_current_method():
-    return CURRENT_METHOD
-
-def set_current_method(method, method_stack):
-    global CURRENT_METHOD
-    CURRENT_METHOD = (method, len(method_stack), method_stack[-1])
-    return CURRENT_METHOD
-
-class xtstr(ctstr):
-    def add_instr(self, op, c_a, c_b):
-        ct = None
-        if len(c_a) == 1 and isinstance(c_a, xtstr):
-            ct = c_a.taint[0]
-        elif len(c_b) == 1 and isinstance(c_b, xtstr):
-            ct = c_b.taint[0]
-        self.comparisons.append((ct, Instr(op, c_a, c_b), get_current_method()))
-
-    def create(self, res, taint):
-        o = xtstr(res, taint, self)
-        o.comparisons = self.comparisons
-        return o
-
-def flatten(key, val):
-    # Should we limit flatened objects to repr ~ tstr here or during call?
-    tv = type(val)
-    if isinstance(val, (int, float, complex, str, bytes, bytearray)):
-        return [(key, val)]
-    elif isinstance(val, (set, frozenset, list, tuple, range)):
-        values = [e for i, elt in enumerate(val) for e in flatten(i, elt)]
-        return [("%s.%d" % (key, i), v) for i, v in values]
-    elif isinstance(val, dict):
-        values = [e for k, elt in val.items() for e in flatten(k, elt)]
-        return [("%s.%s" % (key, k), v) for k, v in values]
-    elif isinstance(val, tstr):
-        return [(key, val)]
-    elif hasattr(val,'__dict__'):
-        values = [e for k, elt in val.__dict__.items() for e in flatten(k, elt)]
-        return [("%s.%s" % (key, k), v) for k, v in values]
-    else:
-        return [(key, repr(v))]
-
-# ### Tainted Tracer
-
-class TaintedTracer(Tracer):
-    def __init__(self, inputstr, restrict={}):
-        self.inputstr = xtstr(inputstr, parent=None).with_comparisons([])
-        self.trace = []
-        self.restrict = restrict
-
-        self.method_num = 0
-        self.method_num_stack = [self.method_num]
-
-    def tracing_var(self, k, v):
-        return isinstance(repr(v), tstr)
-
-    def tracing_context(self, cxt, event, arg):
-        if self.restrict.get('files'):
-            return any(
-                cxt.file_name.endswith(f) for f in self.restrict['files'])
-        if self.restrict.get('methods'):
-            return cxt.method in self.restrict['methods']
-        return True
-
-    def on_event(self, event, arg, cxt, my_vars):
-        super().on_event(event, arg, cxt, my_vars)
-        if event == 'call':
-            self.method_num += 1
-            self.method_num_stack.append(self.method_num)
-        elif event == 'return':
-            self.method_num_stack.pop()
-        set_current_method(cxt.method, self.method_num_stack)
-
-import re
-def to_tree(tree):
-    def simplify(var):
-        return re.sub(r'\[.+\]', '', var)
-    taint_start, taint_stop = tree[1].taint[0], tree[1].taint[-1]
-
-    new_children = []
-    prev_child = None
-    for child in sorted(tree[2], key=lambda c: c[1].taint[0]):
-        if prev_child:
-            assert prev_child[1].taint[0] < child[1].taint[0]
-        prev_child = child
-        child_t_start, child_t_stop = child[1].taint[0], child[1].taint[-1]
-        if child_t_start > taint_start:
-            elt = ''.join(tree[1].x(slice(taint_start, child_t_start)))
-            new_children.append(("<%s>" % repr(elt), [(repr(elt), [])]))
-        new_children.append(to_tree(child))
-        taint_start = child_t_stop + 1
-    if taint_start < taint_stop+1:
-        elt = ''.join(tree[1].x(slice(taint_start, taint_stop + 1)))
-        new_children.append((elt, []))
-    return ("<%s>" % simplify(tree[0]), new_children)
-
 import string
 
 def parse_num(s,i):
@@ -263,27 +44,119 @@ EXPRS = [
     '(25-1/(2+3))*100/3'
 ]
 
-def to_tree(tree):
-    key, val, children = tree
-    taint_start, taint_stop = val.taint[0], val.taint[-1]
 
-    new_children = []
-    for child in sorted(children, key=lambda c: c[1].taint[0]):
-        ckey, cval, cchildren = child
-        child_t_start, child_t_stop = cval.taint[0], cval.taint[-1]
-        # if child taint starts after the root taint, then we have a child
-        # missing with index from taint_start to child_taint_start(non-incl)
-        if child_t_start > taint_start:
-            elt = ''.join(val.x(slice(taint_start, child_t_start)))
-            new_children.append(("<%s>" % repr(elt), [(repr(elt), [])]))
-        # and we append child as before.
-        new_children.append(to_tree(child))
-        # the new taint_start begins next to the taint stop.
-        taint_start = child_t_stop + 1
-    if taint_start < taint_stop + 1:
-        elt = ''.join(val.x(slice(taint_start, taint_stop + 1)))
-        new_children.append((elt, []))
-    return ("<%s>" % key, new_children)
+
+RE_NONTERMINAL = re.compile(r'(<[^<> ]*>)')
+def tree_to_string(tree):
+    def is_nonterminal(s): return re.match(RE_NONTERMINAL, s)
+    symbol, children, *_ = tree
+    if children: return ''.join(tree_to_string(c) for c in children)
+    else: return '' if is_nonterminal(symbol) else symbol
+
+from InformationFlow import tstr, ctstr, Instr
+
+CURRENT_METHOD = None
+
+def get_current_method():
+    return CURRENT_METHOD
+
+def set_current_method(method, method_stack):
+    global CURRENT_METHOD
+    CURRENT_METHOD = (method, len(method_stack), method_stack[-1])
+    return CURRENT_METHOD
+
+class xtstr(ctstr):
+    def add_instr(self, op, c_a, c_b):
+        ct = None
+        if len(c_a) == 1 and isinstance(c_a, xtstr):
+            ct = c_a.taint[0]
+        elif len(c_b) == 1 and isinstance(c_b, xtstr):
+            ct = c_b.taint[0]
+        self.comparisons.append((ct, Instr(op, c_a, c_b), get_current_method()))
+
+    def create(self, res, taint):
+        o = xtstr(res, taint, self)
+        o.comparisons = self.comparisons
+        return o
+
+class Context:
+    def __init__(self, frame, track_caller=True):
+        self.method = self._method(frame)
+        self.parameter_names = self._get_parameters(frame)
+        self.file_name = self._file_name(frame)
+        self.parent = Context(frame.f_back,
+                              False) if track_caller and frame.f_back else None
+
+    def _get_parameters(self, frame):
+        return [
+            frame.f_code.co_varnames[i]
+            for i in range(frame.f_code.co_argcount)
+        ]
+
+    def _file_name(self, frame):
+        return frame.f_code.co_filename
+    
+    def _method(self, frame):
+        return frame.f_code.co_name
+
+    def all_vars(self, frame):
+        return frame.f_locals
+    
+    def __repr__(self):
+        return "%s:%s(%s)" % (self.file_name, self.method, ','.join(self.parameter_names))
+
+class Tracer:
+    def __enter__(self):
+        self.oldtrace = sys.gettrace()
+        sys.settrace(self.trace_event)
+        return self
+
+    def __exit__(self, *args):
+        sys.settrace(self.oldtrace)
+
+    def on_event(self, event, arg, cxt, my_vars):
+        self.trace.append((event, arg, cxt, my_vars))
+
+    def trace_event(self, frame, event, arg):
+        cxt = Context(frame)
+        if not self.tracing_context(cxt, event, arg):
+            return self.trace_event
+
+        my_vars = [(k, v) for k, v in cxt.all_vars(frame).items()
+                   if self.tracing_var(k, v)]
+        self.on_event(event, arg, cxt, my_vars)
+        return self.trace_event
+
+    def __call__(self): return self.inputstr
+
+# ### Tainted Tracer
+class TaintedTracer(Tracer):
+    def __init__(self, inputstr, restrict={}):
+        self.inputstr = xtstr(inputstr, parent=None).with_comparisons([])
+        self.trace = []
+        self.restrict = restrict
+
+        self.method_num = 0
+        self.method_num_stack = [self.method_num]
+
+    def tracing_var(self, k, v): return isinstance(repr(v), tstr)
+
+    def tracing_context(self, cxt, event, arg):
+        if self.restrict.get('files'):
+            return any(
+                cxt.file_name.endswith(f) for f in self.restrict['files'])
+        if self.restrict.get('methods'):
+            return cxt.method in self.restrict['methods']
+        return True
+
+    def on_event(self, event, arg, cxt, my_vars):
+        super().on_event(event, arg, cxt, my_vars)
+        if event == 'call':
+            self.method_num += 1
+            self.method_num_stack.append(self.method_num)
+        elif event == 'return':
+            self.method_num_stack.pop()
+        set_current_method(cxt.method, self.method_num_stack)
 
 if __name__ == "__main__":
     print(EXPRS[1])
@@ -504,8 +377,7 @@ class TaintedTracer(Tracer):
         self.method_num_stack = [start]
         self.method_map = {self.method_num: start}
 
-    def tracing_var(self, k, v):
-        return isinstance(repr(v), tstr)
+    def tracing_var(self, k, v): return isinstance(repr(v), tstr)
 
     def tracing_context(self, cxt, event, arg):
         if self.restrict.get('files'):
