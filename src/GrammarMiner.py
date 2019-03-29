@@ -1,47 +1,5 @@
 #!/usr/bin/env python3
 import sys
-def process_van(year, company, model):
-    desc = "We have a %s %s van from %s vintage." % (company, model, year)
-    iyear = int(year)
-    if iyear > 2010:
-        return "%s\nIt is a recent model!" % desc
-    else:
-        return "%s\nIt is an old but reliable model!" % desc
-
-
-def process_car(year, company, model):
-    desc = "We have a %s %s car from %s vintage." % (company, model, year)
-    iyear = int(year)
-    if iyear > 2016:
-        return "%s\nIt is a recent model!" % desc
-    else:
-        return "%s\nIt is an old but reliable model!" % desc
-
-
-def process_vehicle(vehicle):
-    year, kind, company, model, *_ = vehicle.split(',')
-    if kind == 'van':
-        return process_van(year, company, model)
-    elif kind == 'car':
-        return process_car(year, company, model)
-    else:
-        raise Exception('Invalid entry')
-
-def process_inventory(inventory):
-    result = []
-    for vehicle in inventory.split('\n'):
-        r = process_vehicle(vehicle)
-        result.append(r)
-    return "\n".join(result)
-
-INVENTORY = """\
-1997,van,Ford,E350
-2000,car,Mercury,Cougar
-1999,car,Chevy,Venture\
-"""
-
-VEHICLES = INVENTORY.split('\n')
-
 def traceit(frame, event, arg):
     method_name = frame.f_code.co_name
     if method_name != "process_vehicle":
@@ -161,46 +119,6 @@ URLS = [
         ]
 URLS_X = URLS + ['ftp://freebsd.org/releases/5.8']
 from urllib.parse import urlparse, clear_cache
-
-class InputStack:
-    def __init__(self, i):
-        self.original = i
-        self.inputs = []
-        
-    def height(self):
-        return len(self.inputs)
-
-    def has(self, val):
-        return any(val in var for var in self.inputs[-1].values())
-
-    def ignored(self, val):
-        return not (isinstance(val, str) and len(val) > LOOKAHEAD_LEN)
-
-    def include(self, k, val):
-        if self.ignored(val):
-            return False
-        return self.has(val) if self.inputs else val in self.original
-
-    def push(self, inputs):
-        my_inputs = {k: v for k, v in inputs.items() if self.include(k, v)}
-        self.inputs.append(my_inputs)
-
-    def pop(self):
-        return self.inputs.pop()
-
-class Vars(object):
-    def __init__(self, stack):
-        self.defs = {START_SYMBOL: stack.original}
-        self.istack = stack
-        
-    def set_kv(self, k, v):
-        if k not in self.defs:
-            self.defs[k] = v
-
-    def update(self, v):
-        for k,v in v.items():
-            self.set_kv(k,v)
-
 
 # ## Tainted Miner
 from InformationFlow import tstr, ctstr, rewrite_in, Instr
@@ -377,9 +295,6 @@ if __name__ == "__main__":
 if __name__ == "__main__":
     print('\n## Tainted Miner (2)')
 
-
-
-
 def parse_trees(trace, inputstr):
     # name,stack,children,idxs
     def new_node(s, stack, mid=None, indexes=None):
@@ -492,10 +407,6 @@ def parse_trees(trace, inputstr):
 if __name__ == "__main__":
     my_root = parse_trees(tracer.inputstr.comparisons, str(tracer.inputstr))
 
-
-#for i in tracer.inputstr.comparisons:
-#    print(repr(i))
-
 def to_tree(node, my_str):
     sym = node['sym']
     children = node.get('children')
@@ -507,15 +418,10 @@ def to_tree(node, my_str):
 if __name__ == "__main__":
     to_tree(my_root, str(tracer.inputstr))
 
-
 if __name__ == "__main__":
     print(tracer.inputstr)
     tree = to_tree(my_root, str(tracer.inputstr))
     assert tree_to_string(tree) == str(tracer.inputstr)
-
-
-#from Parser import VAR_GRAMMAR, VAR_TOKENS, canonical
-
 
 def crange(character_start, character_end):
     return [chr(i)
@@ -560,9 +466,6 @@ def canonical(grammar, letters=False):
         for k, alternatives in grammar.items()
     }
 
-
-
-
 if __name__ == "__main__":
     mystring = 'a=1'
     #mystring = 'avar=1.3;bvar=avar-3*(4+300)'
@@ -589,10 +492,6 @@ def unify_rule(grammar, rule, text, at):
             return at, None
         results.append(res)
     return at, results
-
-if __name__ == "__main__":
-    unify_key(C_VG, '<start>', mystring)
-
 
 class TaintedTracer(Tracer):
     def __init__(self, inputstr, restrict={}):
