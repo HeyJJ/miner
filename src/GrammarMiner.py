@@ -71,7 +71,8 @@ class Tracer:
         self.restrict = restrict
 
         self.method_num = 0
-        start = (self.method_num, None, [], {})
+        # method_num, method_name, children
+        start = (self.method_num, None, [])
         self.method_num_stack = [start]
         self.method_map = {self.method_num: start}
 
@@ -100,58 +101,70 @@ class Tracer:
         self.trace.append((event, arg, cxt, my_vars))
         if event == 'call':
             self.method_num += 1
-            n = (self.method_num, cxt.method, [], {})
+
+            # create our method invocation
+            # method_num, method_name, children
+            n = (self.method_num, cxt.method, [])
             self.method_map[self.method_num] = n
+
+            # add ourselves as one of the children to the previous method invocation
             self.method_num_stack[-1][2].append(n)
+
+            # and set us as the current method.
             self.method_num_stack.append(n)
         elif event == 'return':
             self.method_num_stack.pop()
         set_current_method(cxt.method, self.method_num_stack)
 
+# Given a child id, we can retrieve the parent id
+# parent_map[childid] == parent_id
 def to_parent_map(method_map):
     parent_map = {}
     for i in method_map:
-        mid, method, children, ann = method_map[i]
+        mid, _method, children = method_map[i]
         for cmid,*_ in children:
             parent_map[cmid] = mid
     return parent_map
 
-def parse_trees(trace, inputstr, method_map):
-    def add_indexes(node, indexes):
-        for i in indexes:
-            n = new_node(i)
-            node['children'].append(n)
-    parent_map = to_parent_map(method_map)
+# name,stack,children,idxs
+def new_node(s, mid=None):
+    return {'sym': s,'id': mid,'children': []}
 
-    # name,stack,children,idxs
+def add_indexes(node, indexes):
+    for i in indexes:
+        n = new_node(i)
+        node['children'].append(n)
 
-    def new_node(s, mid=None):
-        return {
-            'sym': s,
-            'id': mid,
-            'children': []
-        }
-
-    root = new_node("<%s>" % 'start', mid=0)
-    method_stack = [root]
-    method_stack_map = {s['id'] for s in method_stack}
+def get_last_comparison_on_index(trace, inputstr):
     last_cmp_only = {}
     for idx, _instr, (method_name, stack_len, minfo) in trace:
         if idx is None: continue  # TODO. investigate None idx in IF
         last_cmp_only[idx] = (idx, method_name, stack_len, minfo[0])
-        
+
     for x in last_cmp_only.values():
         idx, method_name, stack_len, mid = x
-        print("%2d" % idx, " ", inputstr[idx], '  |' * stack_len, method_name, mid, "(%d)" % stack_len)
+        c = inputstr[idx]
+        print("%2d" % idx, " ", c, '  |' * stack_len, method_name, mid, "(%d)" % stack_len)
     print()
+    return last_cmp_only
+
+def parse_trees(trace_, inputstr, method_map):
+    last_cmp_only = get_last_comparison_on_index(trace_, inputstr)
+    parent_map = to_parent_map(method_map)
+
+    root = new_node("<%s>" % 'start', mid=0)
+    method_stack = [root]
+    method_stack_map = {s['id'] for s in method_stack}
     
-    last_cmp_values = list(last_cmp_only.values())
-    for idx, m_name, stack_len, mid in last_cmp_values:
-        print("%2d" % idx, repr(inputstr[idx]), '  |' * stack_len, m_name, mid, "(%d)" % stack_len)
+    # idx, m_name, stack_len, mid
+    for idx_, _, _, mid in last_cmp_only.values():
+        cur_char = inputstr[idx_]
+        #print("%2d" % idx, repr(inputstr[idx]), '  |' * stack_len, m_name, mid, "(%d)" % stack_len)
         current = method_stack[-1]
         # look back until we have a parent that is in method_stack_map
         parent_mid = mid
         parents = [parent_mid]
+
         # look for any parent that is in the stack so we can budd off
         # from that point
         while parent_mid not in method_stack_map:
@@ -160,16 +173,18 @@ def parse_trees(trace, inputstr, method_map):
         # at this point, we have found a common parent. Now, pop off the
         # stack so that we reach the common parent.
 
+        common_parent = parents[0]
+
         # pop off the method_stack until we come to the parents[0]
-        while parents[0] != method_stack[-1]['id']:
+        while common_parent != method_stack[-1]['id']:
             v = method_stack.pop()
             method_stack_map.remove(v['id'])
 
         # now start appending until we reach mid
         # note that we also append a node with mid
         for elt in parents[1:]:
-            e_mid, e_method, e_children, e_ann = method_map[elt]
-            idxs = [] if e_mid != mid else [inputstr[idx]]
+            e_mid, e_method, _e_children = method_map[elt]
+            idxs = [] if e_mid != mid else [cur_char]
             node = new_node("<%s>" % e_method, mid=elt)
             add_indexes(node, idxs)
             method_stack[-1]['children'].append(node)
@@ -242,7 +257,7 @@ if __name__ == "__main__":
     C_VG = canonical(VAR_GRAMMAR)
     restrict = {'methods':['unify_key', 'unify_rule']}
     mystring = 'avar=1.3;bvar=avar-3*(4+300)'
-    mystring = 'avar=1' #.3;bvar=avar-3*(4+300)'
+    mystring = 'av=1' #.3;bvar=avar-3*(4+300)'
     with Tracer(mystring, restrict) as tracer:
         unify_key(C_VG, '<start>', tracer())
     assert tracer.inputstr.comparisons
