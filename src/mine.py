@@ -22,7 +22,6 @@ def add_indexes(node, indexes):
 def get_last_comparison_on_index(trace, inputstr):
     last_cmp_only = {}
     for idx, mid in trace:
-        if idx is None: continue
         last_cmp_only[idx] = (idx, mid)
 
     res = []

@@ -3,6 +3,7 @@ import Tracer
 def convert_comparisons(comparisons):
     light_comparisons = []
     for idx, (method, stack_depth, mid) in comparisons:
+        if idx is None: continue
         light_comparisons.append((idx, mid))
     return light_comparisons
 
