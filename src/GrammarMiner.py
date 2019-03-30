@@ -76,12 +76,9 @@ class Tracer:
         self.method_num_stack = [start]
         self.method_map = {self.method_num: start}
 
-    def tracing_var(self, k, v): return isinstance(repr(v), tstr)
-
     def tracing_context(self, cxt, event, arg):
         if self.restrict.get('files'):
-            return any(
-                cxt.file_name.endswith(f) for f in self.restrict['files'])
+            return any(cxt.file_name.endswith(f) for f in self.restrict['files'])
         if self.restrict.get('methods'):
             return cxt.method in self.restrict['methods']
         return True
@@ -91,14 +88,12 @@ class Tracer:
         if not self.tracing_context(cxt, event, arg):
             return self.trace_event
 
-        my_vars = [(k, v) for k, v in cxt.all_vars(frame).items()
-                   if self.tracing_var(k, v)]
-        self.on_event(event, arg, cxt, my_vars)
+        self.on_event(event, arg, cxt)
         return self.trace_event
 
-    def on_event(self, event, arg, cxt, my_vars):
+    def on_event(self, event, arg, cxt):
         # make it tree
-        self.trace.append((event, arg, cxt, my_vars))
+        self.trace.append((event, arg, cxt))
         if event == 'call':
             self.method_num += 1
 
@@ -183,7 +178,8 @@ def parse_trees(trace_, inputstr, method_map):
         # now start appending until we reach mid
         # note that we also append a node with mid
         for elt in parents[1:]:
-            e_mid, e_method, _e_children = method_map[elt]
+            # e_mid, e_method, _e_children
+            e_mid, e_method, _ = method_map[elt]
             idxs = [] if e_mid != mid else [cur_char]
             node = new_node("<%s>" % e_method, mid=elt)
             add_indexes(node, idxs)
