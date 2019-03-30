@@ -29,7 +29,9 @@ class xtstr(ctstr):
             ct = c_a.taint[0]
         elif len(c_b) == 1 and isinstance(c_b, xtstr):
             ct = c_b.taint[0]
-        self.comparisons.append((ct, get_current_method()))
+        m = get_current_method()
+        print(repr(m))
+        self.comparisons.append((ct, m))
 
     def create(self, res, taint):
         o = xtstr(res, taint, self)
@@ -132,15 +134,16 @@ def add_indexes(node, indexes):
 
 def get_last_comparison_on_index(trace, inputstr):
     last_cmp_only = {}
-    for idx, (method_name, stack_len, minfo) in trace:
+    for idx, (_method_name, _stack_len, minfo) in trace:
         if idx is None: continue  # TODO. investigate None idx in IF
-        last_cmp_only[idx] = (idx, method_name, stack_len, minfo[0])
+        # minfo := mid, name, children
+        last_cmp_only[idx] = (idx, _method_name, _stack_len, minfo[0])
 
     res = []
     for x in last_cmp_only.values():
-        idx, method_name, stack_len, mid = x
+        idx, _method_name, _stack_len, mid = x
         c = inputstr[idx]
-        print("%2d" % idx, " ", c, '  |' * stack_len, method_name, mid, "(%d)" % stack_len)
+        print("%2d" % idx, " ", c, '  |' * _stack_len, _method_name, mid, "(%d)" % _stack_len)
         res.append((c, mid))
     print()
     return res
