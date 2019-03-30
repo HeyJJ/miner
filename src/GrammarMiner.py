@@ -17,9 +17,9 @@ CURRENT_METHOD = None
 def get_current_method():
     return CURRENT_METHOD
 
-def set_current_method(method, stack_depth, minfo):
+def set_current_method(method, stack_depth, mid):
     global CURRENT_METHOD
-    CURRENT_METHOD = (method, stack_depth, minfo)
+    CURRENT_METHOD = (method, stack_depth, mid)
     return CURRENT_METHOD
 
 class xtstr(ctstr):
