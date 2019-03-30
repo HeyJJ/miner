@@ -10,7 +10,7 @@ def tree_to_string(tree):
     if children: return ''.join(tree_to_string(c) for c in children)
     else: return '' if is_nonterminal(symbol) else symbol
 
-from InformationFlow import tstr, ctstr
+from InformationFlow import ctstr
 
 CURRENT_METHOD = None
 
@@ -136,15 +136,17 @@ def get_last_comparison_on_index(trace, inputstr):
         if idx is None: continue  # TODO. investigate None idx in IF
         last_cmp_only[idx] = (idx, method_name, stack_len, minfo[0])
 
+    res = []
     for x in last_cmp_only.values():
         idx, method_name, stack_len, mid = x
         c = inputstr[idx]
         print("%2d" % idx, " ", c, '  |' * stack_len, method_name, mid, "(%d)" % stack_len)
+        res.append((c, mid))
     print()
-    return last_cmp_only
+    return res
 
-def parse_trees(trace_, inputstr, method_map):
-    last_cmp_only = get_last_comparison_on_index(trace_, inputstr)
+def parse_trees(trace_comparisons, inputstr, method_map):
+    last_cmp_only = get_last_comparison_on_index(trace_comparisons, inputstr)
     parent_map = to_parent_map(method_map)
 
     root = new_node("<%s>" % 'start', mid=0)
@@ -152,8 +154,7 @@ def parse_trees(trace_, inputstr, method_map):
     method_stack_map = {s['id'] for s in method_stack}
     
     # idx, m_name, stack_len, mid
-    for idx_, _, _, mid in last_cmp_only.values():
-        cur_char = inputstr[idx_]
+    for cur_char, mid in last_cmp_only:
         #print("%2d" % idx, repr(inputstr[idx]), '  |' * stack_len, m_name, mid, "(%d)" % stack_len)
         current = method_stack[-1]
         # look back until we have a parent that is in method_stack_map
