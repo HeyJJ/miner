@@ -17,9 +17,9 @@ CURRENT_METHOD = None
 def get_current_method():
     return CURRENT_METHOD
 
-def set_current_method(method, method_stack):
+def set_current_method(method, stack_depth, minfo):
     global CURRENT_METHOD
-    CURRENT_METHOD = (method, len(method_stack), method_stack[-1])
+    CURRENT_METHOD = (method, stack_depth, minfo)
     return CURRENT_METHOD
 
 class xtstr(ctstr):
@@ -111,7 +111,9 @@ class Tracer:
             self.method_num_stack.append(n)
         elif event == 'return':
             self.method_num_stack.pop()
-        set_current_method(cxt.method, self.method_num_stack)
+        current_minfo = self.method_num_stack[-1] # current
+        current_mid = current_minfo[0]
+        set_current_method(cxt.method, len(self.method_num_stack), current_mid)
 
 # Given a child id, we can retrieve the parent id
 # parent_map[childid] == parent_id
@@ -134,10 +136,10 @@ def add_indexes(node, indexes):
 
 def get_last_comparison_on_index(trace, inputstr):
     last_cmp_only = {}
-    for idx, (_method_name, _stack_len, minfo) in trace:
+    for idx, (_method_name, _stack_len, mid) in trace:
         if idx is None: continue  # TODO. investigate None idx in IF
         # minfo := mid, name, children
-        last_cmp_only[idx] = (idx, _method_name, _stack_len, minfo[0])
+        last_cmp_only[idx] = (idx, _method_name, _stack_len, mid)
 
     res = []
     for x in last_cmp_only.values():
