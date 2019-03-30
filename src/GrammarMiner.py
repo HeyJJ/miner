@@ -93,7 +93,7 @@ class Tracer:
 
     def on_event(self, event, arg, cxt):
         # make it tree
-        self.trace.append((event, arg, cxt))
+        self.trace.append((event, cxt))
         if event == 'call':
             self.method_num += 1
 
