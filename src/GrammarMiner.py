@@ -10,7 +10,7 @@ def tree_to_string(tree):
     if children: return ''.join(tree_to_string(c) for c in children)
     else: return '' if is_nonterminal(symbol) else symbol
 
-from InformationFlow import tstr, ctstr, Instr
+from InformationFlow import tstr, ctstr
 
 CURRENT_METHOD = None
 
@@ -29,7 +29,7 @@ class xtstr(ctstr):
             ct = c_a.taint[0]
         elif len(c_b) == 1 and isinstance(c_b, xtstr):
             ct = c_b.taint[0]
-        self.comparisons.append((ct, Instr(op, c_a, c_b), get_current_method()))
+        self.comparisons.append((ct, get_current_method()))
 
     def create(self, res, taint):
         o = xtstr(res, taint, self)
@@ -132,7 +132,7 @@ def add_indexes(node, indexes):
 
 def get_last_comparison_on_index(trace, inputstr):
     last_cmp_only = {}
-    for idx, _instr, (method_name, stack_len, minfo) in trace:
+    for idx, (method_name, stack_len, minfo) in trace:
         if idx is None: continue  # TODO. investigate None idx in IF
         last_cmp_only[idx] = (idx, method_name, stack_len, minfo[0])
 
