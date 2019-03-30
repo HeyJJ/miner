@@ -21,16 +21,14 @@ def add_indexes(node, indexes):
 
 def get_last_comparison_on_index(trace, inputstr):
     last_cmp_only = {}
-    for idx, (_method_name, _stack_len, mid) in trace:
-        if idx is None: continue  # TODO. investigate None idx in IF
-        # minfo := mid, name, children
-        last_cmp_only[idx] = (idx, _method_name, _stack_len, mid)
+    for idx, mid in trace:
+        if idx is None: continue
+        last_cmp_only[idx] = (idx, mid)
 
     res = []
     for x in last_cmp_only.values():
-        idx, _method_name, _stack_len, mid = x
+        idx, mid = x
         c = inputstr[idx]
-        print("%2d" % idx, " ", c, '  |' * _stack_len, _method_name, mid, "(%d)" % _stack_len)
         res.append((c, mid))
     print()
     return res
@@ -104,5 +102,7 @@ if __name__ == "__main__":
     my_root = parse_trees(comparisons, str(inputstr), method_map)
     #print(my_root)
     tree = to_tree(my_root, inputstr)
-    print(tree)
     assert tree_to_string(tree) == inputstr
+    print(tree)
+    print()
+    print(tree_to_string(tree))

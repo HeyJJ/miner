@@ -1,6 +1,12 @@
 import Tracer
 
-def convert(method_map):
+def convert_comparisons(comparisons):
+    light_comparisons = []
+    for idx, (method, stack_depth, mid) in comparisons:
+        light_comparisons.append((idx, mid))
+    return light_comparisons
+
+def convert_method_map(method_map):
     light_map = {}
     for k in method_map:
         method_num, method_name, children = method_map[k]
@@ -63,19 +69,20 @@ VAR_GRAMMAR = {
 }
 
 import json
+import sys
 if __name__ == "__main__":
-    mystring = 'a=1'
+    mystring = sys.argv[1] #'a=1'
     #mystring = 'avar=1.3;bvar=avar-3*(4+300)'
     C_VG = canonical(VAR_GRAMMAR)
     restrict = {'methods':['unify_key', 'unify_rule']}
-    mystring = 'avar=1.3;bvar=avar-3*(4+300)'
+    #mystring = 'avar=1.3;bvar=avar-3*(4+300)'
     #mystring = 'av=1' #.3;bvar=avar-3*(4+300)'
     with Tracer.Tracer(mystring, restrict) as tracer:
         unify_key(C_VG, '<start>', tracer())
     assert tracer.inputstr.comparisons
     with open('comparisons.json', 'w+') as f:
-        f.write(json.dumps(tracer.inputstr.comparisons))
+        f.write(json.dumps(convert_comparisons(tracer.inputstr.comparisons)))
     with open('method_map.json', 'w+') as f:
-        f.write(json.dumps(convert(tracer.method_map)))
+        f.write(json.dumps(convert_method_map(tracer.method_map)))
     with open('inputstr.json', 'w+') as f:
         f.write(json.dumps(str(tracer.inputstr)))
