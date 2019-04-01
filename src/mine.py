@@ -1,87 +1,54 @@
 #!/usr/bin/env python3
 import json
-# Given a child id, we can retrieve the parent id
-# parent_map[childid] == parent_id
-def to_parent_map(method_map):
-    parent_map = {}
-    for i in method_map:
-        mid, _method, children = method_map[i]
-        for cmid in children:
-            parent_map[cmid] = mid
-    return parent_map
+import sys
+def reconstruct_method_tree(method_map):
+    first = None
+    tree_map = {}
+    for key in method_map:
+        m_id, m_name, m_children = method_map[key]
 
-# name,stack,children,idxs
-def new_node(s, mid=None):
-    return {'sym': s,'id': mid,'children': []}
+        children = []
+        if m_id in tree_map:
+            # just update the name and children
+            assert not tree_map[m_id]
+            tree_map[m_id]['id'] = m_id
+            tree_map[m_id]['name'] = m_name
+            tree_map[m_id]['children'] = children
+            tree_map[m_id]['indexes'] = []
+        else:
+            assert first is None
+            tree_map[m_id] =  {'id':m_id, 'name': m_name, 'children':children, 'indexes':[]}
+            first = m_id
 
-def add_indexes(node, indexes):
-    for i in indexes:
-        n = new_node(i)
-        node['children'].append(n)
+        for c in m_children:
+            assert c not in tree_map
+            val = {}
+            tree_map[c] = val
+            children.append(val)
+    return (first, tree_map)
 
-def get_last_comparison_on_index(trace, inputstr):
+def last_comparisons(comparisons):
     last_cmp_only = {}
-    for idx, mid in trace:
-        last_cmp_only[idx] = (idx, mid)
+    for idx, mid in comparisons:
+        last_cmp_only[idx] = mid
+    return last_cmp_only
 
-    res = []
-    for x in last_cmp_only.values():
-        idx, mid = x
-        c = inputstr[idx]
-        res.append((c, mid))
-    print()
-    return res
+def attach_comparisons(method_tree, comparisons):
+    for idx in comparisons:
+        mid = comparisons[idx]
+        method_tree[mid]['indexes'].append(idx)
 
-def parse_trees(trace_comparisons, inputstr, method_map):
-    last_cmp_only = get_last_comparison_on_index(trace_comparisons, inputstr)
-    parent_map = to_parent_map(method_map)
+from operator import itemgetter
+import itertools as it
 
-    root = new_node("<%s>" % 'start', mid=0)
-    method_stack = [root]
-    method_stack_map = {s['id'] for s in method_stack}
-    
-    # idx, m_name, stack_len, mid
-    for cur_char, mid in last_cmp_only:
-        #print("%2d" % idx, repr(inputstr[idx]), '  |' * stack_len, m_name, mid, "(%d)" % stack_len)
-        current = method_stack[-1]
-        # look back until we have a parent that is in method_stack_map
-        parent_mid = mid
-        parents = [parent_mid]
+def to_node(idxes, my_str):
+    return (my_str[idxes[0]:idxes[-1]+1], [], idxes[0], idxes[-1])
 
-        # look for any parent that is in the stack so we can budd off
-        # from that point
-        while parent_mid not in method_stack_map:
-            parent_mid = parent_map[parent_mid]
-            parents.insert(0, parent_mid)
-        # at this point, we have found a common parent. Now, pop off the
-        # stack so that we reach the common parent.
-
-        common_parent = parents[0]
-
-        # pop off the method_stack until we come to the parents[0]
-        while common_parent != method_stack[-1]['id']:
-            v = method_stack.pop()
-            method_stack_map.remove(v['id'])
-
-        # now start appending until we reach mid
-        # note that we also append a node with mid
-        for elt in parents[1:]:
-            # e_mid, e_method, _e_children
-            e_mid, e_method, _ = method_map[str(elt)]
-            idxs = [] if e_mid != mid else [cur_char]
-            node = new_node("<%s>" % e_method, mid=elt)
-            add_indexes(node, idxs)
-            method_stack[-1]['children'].append(node)
-            method_stack.append(node)
-            method_stack_map.add(node['id'])
-
-    return root
-
-def to_tree(node, my_str):
-    sym = node['sym']
-    children = node.get('children')
-    if children: return (sym, [to_tree(c, my_str) for c in children])
-    else: return (sym, [])
+def indexes_to_children(indexes, my_str):
+    # return a set of one level child nodes with contiguous chars from indexes
+    lst = [list(map(itemgetter(1), g)) for k, g
+            in it.groupby(enumerate(indexes), lambda x:x[0]-x[1])]
+    return [to_node(n, my_str) for n in lst]
 
 import re
 RE_NONTERMINAL = re.compile(r'(<[^<> ]*>)')
@@ -91,18 +58,32 @@ def tree_to_string(tree):
     if children: return ''.join(tree_to_string(c) for c in children)
     else: return '' if is_nonterminal(symbol) else symbol
 
+# assumption: If a node looks
+def to_tree(node, my_str):
+    method_name = node['name']
+    indexes = node['indexes']
+    node_children = [to_tree(c, my_str) for c in node.get('children', [])]
+    idx_children = indexes_to_children(indexes, my_str)
+    children = sorted([c for c in node_children if c is not None] + idx_children, key=lambda x: x[2]) # assert no overlap, and order by starting index
+    if not children:
+        return None
+    start_idx = children[0][2]
+    end_idx = children[-1][3]
+    return (method_name, children, start_idx, end_idx)
+
 if __name__ == "__main__":
-    with open('comparisons.json') as f:
-        comparisons = json.load(f)
-    with open('inputstr.json') as f:
-        inputstr = json.load(f)
     with open('method_map.json') as f:
         method_map = json.load(f)
-    my_root = parse_trees(comparisons, str(inputstr), method_map)
-    #print(my_root)
-    tree = to_tree(my_root, inputstr)
-    print(tree)
-    print(tree_to_string(tree))
-    assert tree_to_string(tree) == inputstr
-    print()
-    print(tree_to_string(tree))
+
+    first, method_tree = reconstruct_method_tree(method_map)
+    with open('comparisons.json') as f:
+        comparisons = json.load(f)
+
+    with open('inputstr.json') as f:
+        my_str = json.load(f)
+
+    print("INPUT:", my_str)
+    attach_comparisons(method_tree, last_comparisons(comparisons))
+    tree = to_tree(method_tree[first], my_str)
+    print("RECONSTRUCTED INPUT:", tree_to_string(tree))
+    assert tree_to_string(tree) == my_str

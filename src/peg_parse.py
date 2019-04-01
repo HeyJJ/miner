@@ -1,3 +1,4 @@
+#!/usr/bin/env python
 import Tracer
 
 import re
@@ -59,7 +60,7 @@ VAR_GRAMMAR = {
 import json
 import sys
 if __name__ == "__main__":
-    mystring = sys.argv[1] #'a=1'
+    mystring = sys.argv[1] if len(sys.argv) > 1 else 'a=1'
     #mystring = 'avar=1.3;bvar=avar-3*(4+300)'
     C_VG = canonical(VAR_GRAMMAR)
     restrict = {'methods':['unify_key', 'unify_rule']}
