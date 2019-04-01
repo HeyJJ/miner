@@ -101,7 +101,8 @@ if __name__ == "__main__":
     my_root = parse_trees(comparisons, str(inputstr), method_map)
     #print(my_root)
     tree = to_tree(my_root, inputstr)
-    assert tree_to_string(tree) == inputstr
     print(tree)
+    print(tree_to_string(tree))
+    assert tree_to_string(tree) == inputstr
     print()
     print(tree_to_string(tree))
