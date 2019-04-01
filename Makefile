@@ -6,8 +6,8 @@ all: mine
 
 trace: comparisons.json
 
-comparisons.json: src/trace.py
-	python3 ./src/trace.py $(ARG)
+comparisons.json: src/peg_parse.py
+	python3 ./src/peg_parse.py $(ARG)
 
 mine: comparisons.json
 	python3 ./src/mine.py

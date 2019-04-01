@@ -89,3 +89,18 @@ class Tracer:
         current_minfo = self.method_num_stack[-1] # current
         current_mid = current_minfo[0]
         set_current_method(cxt.method, len(self.method_num_stack), current_mid)
+
+
+def convert_comparisons(comparisons):
+    light_comparisons = []
+    for idx, (method, stack_depth, mid) in comparisons:
+        if idx is None: continue
+        light_comparisons.append((idx, mid))
+    return light_comparisons
+
+def convert_method_map(method_map):
+    light_map = {}
+    for k in method_map:
+        method_num, method_name, children = method_map[k]
+        light_map[k] = (k, method_name, [c[0] for c in children])
+    return light_map

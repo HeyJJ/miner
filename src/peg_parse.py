@@ -1,18 +1,5 @@
 import Tracer
 
-def convert_comparisons(comparisons):
-    light_comparisons = []
-    for idx, (method, stack_depth, mid) in comparisons:
-        if idx is None: continue
-        light_comparisons.append((idx, mid))
-    return light_comparisons
-
-def convert_method_map(method_map):
-    light_map = {}
-    for k in method_map:
-        method_num, method_name, children = method_map[k]
-        light_map[k] = (k, method_name, [c[0] for c in children])
-    return light_map
 import re
 RE_NONTERMINAL = re.compile(r'(<[^<> ]*>)')
 
@@ -82,8 +69,8 @@ if __name__ == "__main__":
         unify_key(C_VG, '<start>', tracer())
     assert tracer.inputstr.comparisons
     with open('comparisons.json', 'w+') as f:
-        f.write(json.dumps(convert_comparisons(tracer.inputstr.comparisons)))
+        f.write(json.dumps(Tracer.convert_comparisons(tracer.inputstr.comparisons)))
     with open('method_map.json', 'w+') as f:
-        f.write(json.dumps(convert_method_map(tracer.method_map)))
+        f.write(json.dumps(Tracer.convert_method_map(tracer.method_map)))
     with open('inputstr.json', 'w+') as f:
         f.write(json.dumps(str(tracer.inputstr)))
