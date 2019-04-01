@@ -463,8 +463,12 @@ class ctstr(ctstr):
     def find(self, sub, start=None, end=None):
         if start is None:
             start_val = 0
+        else:
+            start_val = start
         if end is None:
             end_val = len(self)
+        else:
+            end_val = end
         self.add_instr(Op.IN, self[start_val:end_val], sub)
         return super().find(sub, start, end)
 
