@@ -1,6 +1,23 @@
 #!/usr/bin/env python3
 import json
 import sys
+
+# reconstruct the actual method trace from a trace with the following
+# format
+# key   : [ mid, method_name, children_ids ]
+# "6704": [ 6704, "unify_key", [6714, 6715] ]  <-- e.g
+# "6714": [ 6714, "unify_val", [] ]
+# "6715": [ 6715, "unify_val", [] ]
+# to:
+# {
+# "6704": [ id: 6704, name: "unify_key", children: [
+#                               "6714": [ id: 6714, name: "unify_val", children: [], indexes:[] ],
+#                               "6715": [ id: 6715, name: "unify_val", children:[], indexes:[] ]
+#                              ],
+#                              indexes: [] ]
+# "6714": [ 6714, "unify_val", [] ]
+# "6715": [ 6715, "unify_val", [] ]
+# }
 def reconstruct_method_tree(method_map):
     first = None
     tree_map = {}
@@ -27,12 +44,7 @@ def reconstruct_method_tree(method_map):
             children.append(val)
     return (first, tree_map)
 
-def last_comparisons(comparisons):
-    last_cmp_only = {}
-    for idx, mid in comparisons:
-        last_cmp_only[idx] = mid
-    return last_cmp_only
-
+# Add the comparison indexes to the method tree that we constructed
 def attach_comparisons(method_tree, comparisons):
     for idx in comparisons:
         mid = comparisons[idx]
@@ -41,9 +53,12 @@ def attach_comparisons(method_tree, comparisons):
 from operator import itemgetter
 import itertools as it
 
+# convert a list of indexes to a corresponding terminal tree node
 def to_node(idxes, my_str):
     return (my_str[idxes[0]:idxes[-1]+1], [], idxes[0], idxes[-1])
 
+# convert our list of indexes to lists of contiguous indexes first, then
+# convert them to terminal tree nodes.
 def indexes_to_children(indexes, my_str):
     # return a set of one level child nodes with contiguous chars from indexes
     lst = [list(map(itemgetter(1), g)) for k, g
@@ -52,13 +67,14 @@ def indexes_to_children(indexes, my_str):
 
 import re
 RE_NONTERMINAL = re.compile(r'(<[^<> ]*>)')
+# convert the derivation tree to string
 def tree_to_string(tree):
     def is_nonterminal(s): return re.match(RE_NONTERMINAL, s)
     symbol, children, *_ = tree
     if children: return ''.join(tree_to_string(c) for c in children)
     else: return '' if is_nonterminal(symbol) else symbol
 
-# assumption: If a node looks
+# convert a mapped tree to the fuzzingbook derivation tree.
 def to_tree(node, my_str):
     method_name = node['name']
     indexes = node['indexes']
@@ -71,6 +87,15 @@ def to_tree(node, my_str):
     end_idx = children[-1][3]
     return (method_name, children, start_idx, end_idx)
 
+# We need only the last comparisons made on any index
+# This means that we care for only the last parse in an
+# ambiguous parse.
+def last_comparisons(comparisons):
+    last_cmp_only = {}
+    for idx, mid in comparisons:
+        last_cmp_only[idx] = mid
+    return last_cmp_only
+
 if __name__ == "__main__":
     with open('method_map.json') as f:
         method_map = json.load(f)
@@ -78,12 +103,11 @@ if __name__ == "__main__":
     first, method_tree = reconstruct_method_tree(method_map)
     with open('comparisons.json') as f:
         comparisons = json.load(f)
+    attach_comparisons(method_tree, last_comparisons(comparisons))
 
     with open('inputstr.json') as f:
         my_str = json.load(f)
-
     print("INPUT:", my_str)
-    attach_comparisons(method_tree, last_comparisons(comparisons))
     tree = to_tree(method_tree[first], my_str)
     print("RECONSTRUCTED INPUT:", tree_to_string(tree))
     assert tree_to_string(tree) == my_str
