@@ -110,4 +110,5 @@ if __name__ == "__main__":
     print("INPUT:", my_str)
     tree = to_tree(method_tree[first], my_str)
     print("RECONSTRUCTED INPUT:", tree_to_string(tree))
+    print(tree)
     assert tree_to_string(tree) == my_str
