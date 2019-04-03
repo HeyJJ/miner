@@ -1,8 +1,23 @@
 import json
 
 
+"""   Convert pygmalion file to specified format   
 
-"""   Convert pygmalion file to specified format   """
+
+Format of pygmalion.json:
+The important parts for constructing the invocation tree and the comparisons are:
+
+- "type": type of event (STACK_EVENT or INPUT_COMPARISON)
+
+- "stack": represents stack as list of method names at that point
+
+- "index": represents index/indices in input string at which comparison occured
+
+- "operator": represents type of comparison operation (!=, ==, strcmp ,...)
+
+
+"""
+
 
 def convert_pygmalion(file):
 
@@ -10,8 +25,8 @@ def convert_pygmalion(file):
 
     method_dict = {} #dict for method_id->(method_id, name, children)
 
-    # irelevant input comparisions
-    irrelevant_operators = ["tokenstore", "tokencomp", "EOF"]
+    # irrelevant input comparisions
+    irrelevant_operators = ["tokenstore", "tokencomp", "EOF", "strlen"]
 
     input_comparisons = []
 
@@ -62,6 +77,8 @@ def convert_pygmalion(file):
 
     with open("my_comparisons.json", 'w+') as mfile:
         json.dump(input_comparisons, mfile)
+
+    #write inputstr to json file ??
 
 
 if __name__ == "__main__":
