@@ -1,5 +1,15 @@
 CHECKSUM_REPAIR=../checksum-repair
+java=java
 .PHONY: trace mine
+
+PROJECTS=calc_parse
+
+T_INSTRUMENTED=$(add-prefix,.,$(add-suffix,$(PROJECTS),.instrumented))
+T_RUN=$(add-prefix,.,$(add-suffix,$(PROJECTS),.run))
+T_TAINT=$(add-prefix,.,$(add-suffix,$(PROJECTS),.taint))
+T_TRACE=$(add-prefix,.,$(add-suffix,$(PROJECTS),.trace))
+
+.PRECIOUS: $(T_INSTRUMENTED) $(T_RUN) $(T_TAINT) $(T_TRACE)
 
 .SECONDARY: peg_call_trace.json calc_call_trace.json
 
@@ -26,17 +36,40 @@ convert: pygmalion.json
 %_mine: %_call_trace.json
 	python3 ./src/mine.py $<
 
-%_instrument: subjects/%_parse.c
+
+## ---- INSTRUMENT-----
+
+instrument_%: .%.instrumented; @echo done
+.%.instrumented: subjects/%.c
 	./bin/trace-instr $< $(CHECKSUM_REPAIR)/samples/excluded_functions
+	touch $@
+
+## ---- RUN -----
+
+run_%: .%.run; @echo done
+.%.run: .%.instrumented
+	echo $(INPUTSTR) | ./build/$*.instrumented
+	mv output build/$*.output
+	gzip -c build/$*.output > build/$*.output.gz
+	touch $@
+
+## ---- OFFLINE TAINT ANALYSIS ---
+
+taint_%: .%.taint; @echo done
+.%.taint: .%.run
+	$(java) -cp "$(CHECKSUM_REPAIR)/install/lib/java/*" main.TaintTracker -me build/calc_parse/metadata -po build/$*.pygmalion.json -t build/$*.output.gz
+	touch $@
+
+## ---- OFFLINE CALL TRACE ---
+trace_%: .%.trace; @echo done
+.%.trace: .%.taint
+	cat build/$*.pygmalion.json | python3 ./src/converter.py $(INPUTSTR) > build/$*.call_trace.json
+	touch $@
 
 
-#run your C-program (example)
-run: calc_instrument
-	echo $(INPUTSTR) | ./build/calc_parse/calc_parse.instrumented
+## ---- MINE GRAMMAR ---
 
-#zip output file
-
-#generate taint from the trace
-taint:
-	gzip -c output > output.gz
-	java -cp "$(CHECKSUM_REPAIR)/install/lib/java/*" main.TaintTracker -me build/calc_parse/metadata -po pygmalion.json -t output.gz
+mine_%: .%.mine; @echo done
+.%.mine: .%.trace
+	python3 ./src/mine.py build/$*.call_trace.json
+	touch $@
