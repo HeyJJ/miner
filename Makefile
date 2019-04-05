@@ -7,8 +7,9 @@ T_INSTRUMENTED=$(addsuffix .instrumented,$(PROJECTS))
 T_RUN=$(addsuffix .run,$(PROJECTS))
 T_TAINT=$(addsuffix .taint,$(PROJECTS))
 T_TRACE=$(addsuffix .trace,$(PROJECTS))
+T_MINE=$(addsuffix .mine,$(PROJECTS))
 
-.PRECIOUS: $(addprefix build/.,$(T_INSTRUMENTED) $(T_RUN) $(T_TAINT) $(T_TRACE))
+.PRECIOUS: $(addprefix build/.,$(T_INSTRUMENTED) $(T_RUN) $(T_TAINT) $(T_TRACE) $(T_MINE))
 
 .SECONDARY: peg_call_trace.json calc_call_trace.json
 
