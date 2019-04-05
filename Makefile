@@ -3,15 +3,16 @@ java=java
 .PHONY: trace mine
 
 PROJECTS=calc_parse
-T_UNINSTRUMENTED=$(addsuffix .uninstrumented,$(PROJECTS))
+T_UNINSTRUMENTED=$(addsuffix .uninstrumentedbc,$(PROJECTS))
+T_ORIGINAL=$(addsuffix .original,$(PROJECTS))
 T_INSTRUMENTED=$(addsuffix .instrumented,$(PROJECTS))
-T_BITCODE=$(addsuffix .bitcode,$(PROJECTS))
+T_BITCODE=$(addsuffix .metadata,$(PROJECTS))
 T_RUN=$(addsuffix .run,$(PROJECTS))
 T_TAINT=$(addsuffix .taint,$(PROJECTS))
 T_TRACE=$(addsuffix .trace,$(PROJECTS))
 T_MINE=$(addsuffix .mine,$(PROJECTS))
 
-.PRECIOUS: $(addprefix build/.,$(T_UNINSTRUMENTED) $(T_INSTRUMENTED) $(T_BITCODE) $(T_RUN) $(T_TAINT) $(T_TRACE) $(T_MINE)) $(addsuffix /uninstrumented,$(addprefix build/,$(PROJECTS)))
+.PRECIOUS: $(addprefix build/.,$(T_ORIGINAL) $(T_UNINSTRUMENTED) $(T_INSTRUMENTED) $(T_BITCODE) $(T_RUN) $(T_TAINT) $(T_TRACE) $(T_MINE)) $(addsuffix /uninstrumented,$(addprefix build/,$(PROJECTS)))
 
 .SECONDARY: peg_call_trace.json calc_call_trace.json
 
@@ -37,8 +38,8 @@ clean:
 DAGGER=$(HOME)/Research/dagger/build/bin/llvm-dec
 
 decompile_%: build/.%.decompiled; @echo done
-build/.%.decompiled: build/.%.uninstrumented
-	$(DAGGER) build/$*/uninstrumented > build/$*/dagger.bc
+build/.%.decompiled: build/.%.original
+	$(DAGGER) build/$*/original > build/$*/dagger.bc
 	touch $@
 
 INPUTSTR="(1+23)+(123-43)/3*1"
@@ -51,23 +52,26 @@ TRACEPLUGIN=$(CHECKSUM_REPAIR)/build/debug/modules/trace-instr/libtraceplugin.dy
 EXCLUDED_FUNCTIONS=$(CHECKSUM_REPAIR)/samples/excluded_functions
 
 ## ----  COMPILE ---
-build/.%.uninstrumented: subjects/%.c | build
-	$(CLANG) -g -D_FORTIFY_SOURCE=0 -o build/$*/uninstrumented -x c $< -ldl
+build/.%.original: subjects/%.c | build
+	$(CLANG) -g -D_FORTIFY_SOURCE=0 -o build/$*/original -x c $< -ldl
 	touch $@
 
 ## ---- GEN UNINSTRUMETED BITCODE -----
-bitcode_%: build/.%.bitcode; @echo done
-build/.%.bitcode: subjects/%.c | build
+ubc_%: build/.%.uninstrumentedbc; @echo done
+build/.%.uninstrumentedbc: subjects/%.c | build
 	mkdir -p build/$*
-	# build instrumented version
 	$(CLANG) -g -S -D_FORTIFY_SOURCE=0 -emit-llvm -include $(INCDIR)/traceinstr/wrapper_libc.h -o build/$*/uninstrumented.bc -x c $<
+	touch $@
+
+metadata%: build/.%.metadata; @echo done
+build/.%.metadata: build/.%.uninstrumentedbc
 	# extract metadata for taint analysis
 	$(CHECKSUM_REPAIR)/install/bin/extract_metadata -ef $(EXCLUDED_FUNCTIONS) -f build/$*/uninstrumented.bc
 	touch $@
 
 ## ---- INSTRUMENT BITCODE-----
 instrument_%: build/.%.instrumented; @echo done
-build/.%.instrumented: build/.%.bitcode build/.%.uninstrumented | build
+build/.%.instrumented: build/.%.metadata build/.%.uninstrumentedbc | build
 	$(LLVM) -S -instnamer -reg2mem -load $(TRACEPLUGIN) -traceplugin -exclude_functions $(EXCLUDED_FUNCTIONS) -disable-verify build/$*/uninstrumented.bc -o  build/$*/opt_debug.bc
 	$(LLVM) -S -strip-debug build/$*/opt_debug.bc -o build/$*/debug.bc
 	$(CLANG) -fno-inline -O3 -o build/$*.instrumented build/$*/debug.bc -L$(LIBDIR) -lwrappermain -lwrapperlibc -lsimpletracer -ljson-c -lm -lz -ldl
