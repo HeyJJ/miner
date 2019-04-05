@@ -1,3 +1,4 @@
+#!/usr/bin/env python3
 import json
 import sys
 """   Convert pygmalion file to specified format   
@@ -45,7 +46,7 @@ def convert_pygmalion(instr):
                 method_id = methods[method] #get id from helper dict
                 input_comparisons.append((index, method_id))
 
-    print(json.dumps({'inputstr': instr, 'method_dict': method_dict, 'comparisons': input_comparisons}, indent=2, sort_keys=False))
+    print(json.dumps({'inputstr': instr, 'method_map': method_dict, 'comparisons': input_comparisons}, indent=2, sort_keys=False))
 
 if __name__ == "__main__":
     convert_pygmalion(sys.argv[1])
