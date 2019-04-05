@@ -17,7 +17,12 @@ def convert_pygmalion(instr):
     # irrelevant input comparisions
     irrelevant_operators = ["tokenstore", "tokencomp", "EOF", "strlen"]
     input_comparisons = []
-    for line in sys.stdin.readlines():
+    if len(sys.argv) > 2:
+        with open(sys.argv[2]) as f:
+            lines = f.readlines()
+    else:
+        lines = sys.stdin.readlines()
+    for i,line in enumerate(lines):
             #ignore comments
             if not line.startswith("{"): continue
             data = json.loads(line)
@@ -41,7 +46,8 @@ def convert_pygmalion(instr):
                 operator = data['operator']
                 if operator in irrelevant_operators:
                     continue
-                index = data['index'][0] # !! for strcmp there is a list of indeces. Only taken first one.
+                indexes = data['index'] # !! for strcmp there is a list of indeces. Only taken first one.
+                index = indexes[0] # !! for strcmp there is a list of indeces. Only taken first one.
                 method = data['stack'][-1]
                 method_id = methods[method] #get id from helper dict
                 input_comparisons.append((index, method_id))

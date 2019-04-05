@@ -30,7 +30,9 @@ clean:
 INPUTSTR="(1+23)+(123-43)/3*1"
 
 convert: pygmalion.json
-	cat pygmalion.json | python3 ./src/converter.py $(INPUTSTR) > calc_call_trace.json
+	cat pygmalion.json | grep -v '"operator":"tokenstore" \
+		| grep -v '"operator":"tokencomp"'\
+	 	| grep -v '"operator":"strlen"'| python3 ./src/converter.py $(INPUTSTR) > calc_call_trace.json
 
 %_mine: %_call_trace.json
 	python3 ./src/mine.py $<
