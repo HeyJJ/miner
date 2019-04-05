@@ -10,7 +10,7 @@ The important parts for constructing the invocation tree and the comparisons are
 Author: Julia Hess
 """
 
-def convert_pygmalion():
+def convert_pygmalion(instr):
     methods={} #helper dict method_name->id
     method_dict = {} #dict for method_id->(method_id, name, children)
     # irrelevant input comparisions
@@ -45,7 +45,7 @@ def convert_pygmalion():
                 method_id = methods[method] #get id from helper dict
                 input_comparisons.append((index, method_id))
 
-    print(json.dumps({'method_dict': method_dict, 'comparisons': input_comparisons}, indent=2, sort_keys=False))
+    print(json.dumps({'inputstr': instr, 'method_dict': method_dict, 'comparisons': input_comparisons}, indent=2, sort_keys=False))
 
 if __name__ == "__main__":
-    convert_pygmalion()
+    convert_pygmalion(sys.argv[1])

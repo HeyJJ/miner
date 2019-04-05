@@ -97,18 +97,21 @@ def last_comparisons(comparisons):
     return last_cmp_only
 
 if __name__ == "__main__":
-    with open('method_map.json') as f:
-        method_map = json.load(f)
+    call_trace_f = 'call_trace.json' if len(sys.argv) < 2 else sys.argv[1]
+    with open(call_trace_f) as f:
+        call_trace = json.load(f)
+    method_map = call_trace['method_map']
 
     first, method_tree = reconstruct_method_tree(method_map)
-    with open('comparisons.json') as f:
-        comparisons = json.load(f)
+    comparisons = call_trace['comparisons']
     attach_comparisons(method_tree, last_comparisons(comparisons))
 
-    with open('inputstr.json') as f:
-        my_str = json.load(f)
+    my_str = call_trace['inputstr']
+
     print("INPUT:", my_str)
     tree = to_tree(method_tree[first], my_str)
     print("RECONSTRUCTED INPUT:", tree_to_string(tree))
     print(tree)
     assert tree_to_string(tree) == my_str
+    with open('derivation_tree.json', 'w+') as f:
+        json.dump(tree, f)
