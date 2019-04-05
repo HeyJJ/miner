@@ -15,7 +15,7 @@ T_MINE=$(addsuffix .mine,$(PROJECTS))
 
 ARG='a=1'
 
-all: peg_mine
+all: mine_calc_parse
 
 %_call_trace.json: src/%_parse.py
 	python3 ./src/$*_parse.py $(ARG) > _$@
