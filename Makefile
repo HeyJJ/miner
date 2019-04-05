@@ -27,17 +27,11 @@ all: peg_mine
 clean:
 	rm -rf *.json build
 
-INPUTSTR="(1+23)+(123-43)/3*1"
-
-convert: pygmalion.json
-	cat pygmalion.json | grep -v '"operator":"tokenstore" \
-		| grep -v '"operator":"tokencomp"'\
-	 	| grep -v '"operator":"strlen"'| python3 ./src/converter.py $(INPUTSTR) > calc_call_trace.json
-
 %_mine: %_call_trace.json
 	python3 ./src/mine.py $<
 
 
+INPUTSTR="(1+23)+(123-43)/3*1"
 ## ---- INSTRUMENT-----
 
 instrument_%: build/.%.instrumented; @echo done
@@ -64,7 +58,11 @@ build/.%.taint: build/.%.run
 ## ---- OFFLINE CALL TRACE ---
 trace_%: build/.%.trace; @echo done
 build/.%.trace: build/.%.taint
-	cat build/$*.pygmalion.json | python3 ./src/converter.py $(INPUTSTR) > build/$*.call_trace.json
+	cat build/$*.pygmalion.json \
+		| grep -v '"operator":"tokenstore"' \
+		| grep -v '"operator":"tokencomp"'\
+		| grep -v '"operator":"strlen"' \
+		| python3 ./src/converter.py $(INPUTSTR) > build/$*.call_trace.json
 	touch $@
 
 

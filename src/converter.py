@@ -48,6 +48,10 @@ def convert_pygmalion(instr):
                     continue
                 indexes = data['index'] # !! for strcmp there is a list of indeces. Only taken first one.
                 index = indexes[0] # !! for strcmp there is a list of indeces. Only taken first one.
+                #if len(instr) > index:
+                #    print(index, instr[index], file=sys.stderr)
+                #else:
+                #    print("XXX", file=sys.stderr)
                 method = data['stack'][-1]
                 method_id = methods[method] #get id from helper dict
                 input_comparisons.append((index, method_id))
