@@ -10,18 +10,27 @@ The important parts for constructing the invocation tree and the comparisons are
 - "operator": represents type of comparison operation (!=, ==, strcmp ,...)
 Author: Julia Hess
 """
+IGNORE = ["tokenstore", "tokencomp", "EOF", "strlen"]
 
 def convert_pygmalion(instr):
     methods={} #helper dict method_name->id
     method_dict = {} #dict for method_id->(method_id, name, children)
     # irrelevant input comparisions
-    irrelevant_operators = ["tokenstore", "tokencomp", "EOF", "strlen"]
     input_comparisons = []
     if len(sys.argv) > 2:
         with open(sys.argv[2]) as f:
             lines = f.readlines()
     else:
         lines = sys.stdin.readlines()
+    method_count = -1
+    method_id = -1
+    parent_id = -1
+    old_stack_size = 0
+    method_stack = [(None, -1, [])]
+    current_method = None
+    method_map = {}
+    old_stack = None
+    children = []
     for i,line in enumerate(lines):
             #ignore comments
             if not line.startswith("{"): continue
@@ -29,34 +38,28 @@ def convert_pygmalion(instr):
             '''build tree of invocations'''
             if data['type'] == "STACK_EVENT":
                 stack = data['stack']
-                parent_id = 0
-                for method in stack:
-                    if method in methods.keys():
-                        parent_id = methods[method]
-                        continue
-                    else:
-                        method_id = len(methods) #starts with 0
-                        methods[method] = method_id
-                        method_dict[method_id] = (method_id, method, [])
-                        if method_id > 0:
-                            method_dict[parent_id][2].append(method_id)
+                if len(stack) > old_stack_size:
+                    method_count += 1
+                    method_id = method_count
+                    current_method = (method_id, stack[-1], [])
+                    method_map[method_id] = current_method
+                    method_stack[-1][2].append(method_id)
+                    method_stack.append(current_method)
+                    old_stack_size = len(stack)
+                elif len(stack) < old_stack_size:
+                    method_stack.pop()
+                    method_id, _, _ = method_stack[-1]
+                    old_stack_size = len(stack)
+                else:
+                    assert False
+                old_stack = stack
 
             '''build list of comparisions'''
-            if data['type'] == "INPUT_COMPARISON":
-                operator = data['operator']
-                if operator in irrelevant_operators:
-                    continue
-                indexes = data['index'] # !! for strcmp there is a list of indeces. Only taken first one.
-                index = indexes[0] # !! for strcmp there is a list of indeces. Only taken first one.
-                #if len(instr) > index:
-                #    print(index, instr[index], file=sys.stderr)
-                #else:
-                #    print("XXX", file=sys.stderr)
-                method = data['stack'][-1]
-                method_id = methods[method] #get id from helper dict
+            if data['type'] == "INPUT_COMPARISON" and data['operator'] not in IGNORE:
+                index = data['index'][0] # !! for strcmp there is a list of indeces. Only taken first one.
                 input_comparisons.append((index, method_id))
 
-    print(json.dumps({'inputstr': instr, 'method_map': method_dict, 'comparisons': input_comparisons}, indent=2, sort_keys=False))
+    print(json.dumps({'inputstr': instr, 'method_map': method_map, 'comparisons': input_comparisons}, indent=2, sort_keys=False))
 
 if __name__ == "__main__":
     convert_pygmalion(sys.argv[1])
