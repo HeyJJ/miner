@@ -3,13 +3,15 @@ java=java
 .PHONY: trace mine
 
 PROJECTS=calc_parse
+T_UNINSTRUMENTED=$(addsuffix .uninstrumented,$(PROJECTS))
 T_INSTRUMENTED=$(addsuffix .instrumented,$(PROJECTS))
+T_BITCODE=$(addsuffix .bitcode,$(PROJECTS))
 T_RUN=$(addsuffix .run,$(PROJECTS))
 T_TAINT=$(addsuffix .taint,$(PROJECTS))
 T_TRACE=$(addsuffix .trace,$(PROJECTS))
 T_MINE=$(addsuffix .mine,$(PROJECTS))
 
-.PRECIOUS: $(addprefix build/.,$(T_INSTRUMENTED) $(T_RUN) $(T_TAINT) $(T_TRACE) $(T_MINE)) $(addsuffix /uninstrumented,$(addprefix build/,$(PROJECTS)))
+.PRECIOUS: $(addprefix build/.,$(T_UNINSTRUMENTED) $(T_INSTRUMENTED) $(T_BITCODE) $(T_RUN) $(T_TAINT) $(T_TRACE) $(T_MINE)) $(addsuffix /uninstrumented,$(addprefix build/,$(PROJECTS)))
 
 .SECONDARY: peg_call_trace.json calc_call_trace.json
 
@@ -31,6 +33,13 @@ clean:
 %_mine: %_call_trace.json
 	python3 ./src/mine.py $<
 
+## ----  DECOMPILE ---
+DAGGER=$(HOME)/Research/dagger/build/bin/llvm-dec
+
+decompile_%: build/.%.decompiled; @echo done
+build/.%.decompiled: build/.%.uninstrumented
+	$(DAGGER) build/$*/uninstrumented > build/$*/dagger.bc
+	touch $@
 
 INPUTSTR="(1+23)+(123-43)/3*1"
 
@@ -41,10 +50,13 @@ INCDIR=$(CHECKSUM_REPAIR)/install/include
 TRACEPLUGIN=$(CHECKSUM_REPAIR)/build/debug/modules/trace-instr/libtraceplugin.dylib
 EXCLUDED_FUNCTIONS=$(CHECKSUM_REPAIR)/samples/excluded_functions
 
-build/%/uninstrumented: subjects/%.c | build
+## ----  COMPILE ---
+build/.%.uninstrumented: subjects/%.c | build
 	$(CLANG) -g -D_FORTIFY_SOURCE=0 -o build/$*/uninstrumented -x c $< -ldl
+	touch $@
+
 ## ---- GEN UNINSTRUMETED BITCODE -----
-bitcode%: build/.%.bitcode; @echo done
+bitcode_%: build/.%.bitcode; @echo done
 build/.%.bitcode: subjects/%.c | build
 	mkdir -p build/$*
 	# build instrumented version
@@ -55,7 +67,7 @@ build/.%.bitcode: subjects/%.c | build
 
 ## ---- INSTRUMENT BITCODE-----
 instrument_%: build/.%.instrumented; @echo done
-build/.%.instrumented: build/.%.bitcode build/%/uninstrumented | build
+build/.%.instrumented: build/.%.bitcode build/.%.uninstrumented | build
 	$(LLVM) -S -instnamer -reg2mem -load $(TRACEPLUGIN) -traceplugin -exclude_functions $(EXCLUDED_FUNCTIONS) -disable-verify build/$*/uninstrumented.bc -o  build/$*/opt_debug.bc
 	$(LLVM) -S -strip-debug build/$*/opt_debug.bc -o build/$*/debug.bc
 	$(CLANG) -fno-inline -O3 -o build/$*.instrumented build/$*/debug.bc -L$(LIBDIR) -lwrappermain -lwrapperlibc -lsimpletracer -ljson-c -lm -lz -ldl
