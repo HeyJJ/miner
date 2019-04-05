@@ -3,13 +3,12 @@ java=java
 .PHONY: trace mine
 
 PROJECTS=calc_parse
+T_INSTRUMENTED=$(addsuffix .instrumented,$(PROJECTS))
+T_RUN=$(addsuffix .run,$(PROJECTS))
+T_TAINT=$(addsuffix .taint,$(PROJECTS))
+T_TRACE=$(addsuffix .trace,$(PROJECTS))
 
-T_INSTRUMENTED=$(add-prefix,.,$(add-suffix,$(PROJECTS),.instrumented))
-T_RUN=$(add-prefix,.,$(add-suffix,$(PROJECTS),.run))
-T_TAINT=$(add-prefix,.,$(add-suffix,$(PROJECTS),.taint))
-T_TRACE=$(add-prefix,.,$(add-suffix,$(PROJECTS),.trace))
-
-.PRECIOUS: $(T_INSTRUMENTED) $(T_RUN) $(T_TAINT) $(T_TRACE)
+.PRECIOUS: $(addprefix build/.,$(T_INSTRUMENTED) $(T_RUN) $(T_TAINT) $(T_TRACE))
 
 .SECONDARY: peg_call_trace.json calc_call_trace.json
 
@@ -39,15 +38,15 @@ convert: pygmalion.json
 
 ## ---- INSTRUMENT-----
 
-instrument_%: .%.instrumented; @echo done
-.%.instrumented: subjects/%.c
+instrument_%: build/.%.instrumented; @echo done
+build/.%.instrumented: subjects/%.c
 	./bin/trace-instr $< $(CHECKSUM_REPAIR)/samples/excluded_functions
 	touch $@
 
 ## ---- RUN -----
 
-run_%: .%.run; @echo done
-.%.run: .%.instrumented
+run_%: build/.%.run; @echo done
+build/.%.run: build/.%.instrumented
 	echo $(INPUTSTR) | ./build/$*.instrumented
 	mv output build/$*.output
 	gzip -c build/$*.output > build/$*.output.gz
@@ -55,21 +54,21 @@ run_%: .%.run; @echo done
 
 ## ---- OFFLINE TAINT ANALYSIS ---
 
-taint_%: .%.taint; @echo done
-.%.taint: .%.run
+taint_%: build/.%.taint; @echo done
+build/.%.taint: build/.%.run
 	$(java) -cp "$(CHECKSUM_REPAIR)/install/lib/java/*" main.TaintTracker -me build/calc_parse/metadata -po build/$*.pygmalion.json -t build/$*.output.gz
 	touch $@
 
 ## ---- OFFLINE CALL TRACE ---
-trace_%: .%.trace; @echo done
-.%.trace: .%.taint
+trace_%: build/.%.trace; @echo done
+build/.%.trace: build/.%.taint
 	cat build/$*.pygmalion.json | python3 ./src/converter.py $(INPUTSTR) > build/$*.call_trace.json
 	touch $@
 
 
 ## ---- MINE GRAMMAR ---
 
-mine_%: .%.mine; @echo done
-.%.mine: .%.trace
+mine_%: build/.%.mine; @echo done
+build/.%.mine: build/.%.trace
 	python3 ./src/mine.py build/$*.call_trace.json
 	touch $@
