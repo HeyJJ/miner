@@ -34,7 +34,6 @@ clean:
 
 INPUTSTR="(1+23)+(123-43)/3*1"
 
-## ---- INSTRUMENT-----
 LLVM=$(HOME)/toolchains/llvm+clang-401-x86_64-apple-darwin18.2.0/bin/opt
 CLANG=$(HOME)/toolchains/llvm+clang-401-x86_64-apple-darwin18.2.0/bin/clang
 LIBDIR=$(CHECKSUM_REPAIR)/install/lib
@@ -42,17 +41,23 @@ INCDIR=$(CHECKSUM_REPAIR)/install/include
 TRACEPLUGIN=$(CHECKSUM_REPAIR)/build/debug/modules/trace-instr/libtraceplugin.dylib
 EXCLUDED_FUNCTIONS=$(CHECKSUM_REPAIR)/samples/excluded_functions
 
-instrument_%: build/.%.instrumented; @echo done
-build/.%.instrumented: subjects/%.c | build
+## ---- GEN BITCODE -----
+bitcode%: build/.%.bitcode; @echo done
+build/.%.bitcode: subjects/%.c | build
 	mkdir -p build/$*
-	$(CLANG) -g -D_FORTIFY_SOURCE=0 -o build/$*/uninstrumented -x c $< -ldl
 	# build instrumented version
+	$(CLANG) -g -D_FORTIFY_SOURCE=0 -o build/$*/uninstrumented -x c $< -ldl
 	$(CLANG) -g -S -D_FORTIFY_SOURCE=0 -emit-llvm -include $(INCDIR)/traceinstr/wrapper_libc.h -o build/$*/uninstrumented.bc -x c $<
+	# extract metadata for taint analysis
+	$(CHECKSUM_REPAIR)/install/bin/extract_metadata -ef $(EXCLUDED_FUNCTIONS) -f build/$*/uninstrumented.bc
+	touch $@
+
+## ---- INSTRUMENT-----
+instrument_%: build/.%.instrumented; @echo done
+build/.%.instrumented: build/.%.bitcode | build
 	$(LLVM) -S -instnamer -reg2mem -load $(TRACEPLUGIN) -traceplugin -exclude_functions $(EXCLUDED_FUNCTIONS) -disable-verify build/$*/uninstrumented.bc -o  build/$*/opt_debug.bc
 	$(LLVM) -S -strip-debug build/$*/opt_debug.bc -o build/$*/debug.bc
 	$(CLANG) -fno-inline -O3 -o build/$*.instrumented build/$*/debug.bc -L$(LIBDIR) -lwrappermain -lwrapperlibc -lsimpletracer -ljson-c -lm -lz -ldl
-	# extract metadata for taint analysis
-	$(CHECKSUM_REPAIR)/install/bin/extract_metadata -ef $(EXCLUDED_FUNCTIONS) -f build/$*/uninstrumented.bc
 	touch $@
 
 ## ---- RUN -----
