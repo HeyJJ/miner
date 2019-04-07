@@ -1,162 +1,89 @@
-//
-// Created by Julia on 2019-04-02.
-//
-
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <ctype.h>
 #include "stdbool.h"
-#include "calc_parse.h"
+#define MAX_STR_SIZE 10000
 
-struct index_num parse_num(char* s, int i){
+typedef struct str {
+  char my_string[MAX_STR_SIZE];
+  int idx;
+} my_arg;
 
-    printf("Entering parse_num...\n");
+void parse_num(my_arg *arg);
+void parse_expr(my_arg *arg);
+void parse_paren(my_arg *arg);
+int nesting = 0;
 
-    struct index_num result;
-
-    char* buf = (char*) malloc((strlen(s)-i) * sizeof(char)); //
-
-    for (int j=0; j<strlen(s); j++){
-        if (!isdigit(s[i])){
-            break;
-        } else {
-            buf[j] = s[i];
-            i++;
-        }
-    }
-
-    result.index = i;
-    result.number_str = strdup(buf);
-
-    printf("Leaving parse_num...\n");
-
-    return result;
-
+void tab_enter(char* proc, my_arg* arg) {
+  for (int i = 0; i < nesting; i++)fprintf(stderr, "\t"); fprintf(stderr,"-> %s %d\n", proc, arg->idx);
+  nesting += 1;
 }
 
-
-struct index_expr parse_paren(char* s, int i) {
-
-    printf("Entering parse_paren...\n");
-
-
-    if (s[i] != '('){
-        printf("parse paren without '(' in the beginning.\n");
-    } else {
-
-        struct index_expr result;
-        result = parse_expr(s, i+1);
-
-        if (result.index > strlen(s)){
-            printf("Warning: index greater than string len!\n");
-        }
-
-        if (s[result.index] == ' '){
-            printf("Error '' parse_paren.\n");
-        } else {
-
-            if (s[result.index] != ')'){
-                printf("Missing closing paren!\n");
-
-            } else {
-                result.index += 1;
-                printf("Leaving parse_paren...\n");
-                return result;
-            }
-        }
-    }
+void tab_exit(char* proc, my_arg* arg) {
+  nesting -= 1;
+  for (int i = 0; i < nesting; i++)fprintf(stderr,"\t"); fprintf(stderr,"<- %s %d\n", proc, arg->idx);
 }
 
-
-/*
- *
- * ATTENTION:
- * Return values not correct yet.
- *
- */
-
-struct index_expr parse_expr(char* s, int i) {
-
-    printf("Entering parse_expr...\n");
-
-
-    struct index_expr expressions;
-
-    expressions.expr_list = (char**) malloc((strlen(s)-i)* sizeof(char*));
-
-    char** expr = expressions.expr_list;
-
-    struct index_num number;
-    struct index_expr paren;
-
-
-    while ( i < strlen(s)){
-        char c = s[i];
-        if (isdigit(c)){
-            number = parse_num(s, i);
-            i = number.index; //set new index in input string
-            *expr = number.number_str; //=expr.append(number)
-            expr++;
-        }
-
-        else if (c == '+' || c == '-' || c == '*' || c == '/'){
-            //
-            char str[2];
-            str[0] = c;
-            //string always ends with a null character
-            str[1] = '\0';
-            *expr = str;
-            expr++;
-            i++;
-        }
-        else if (c == '('){
-            paren = parse_paren(s, i);
-            i = paren.index; //-.-
-
-            *expr = *paren.expr_list; //### this doesn't work if it's a list of expressions instead of char*
-
-            expr++;
-
-        }
-        else if (c == ')'){
-            expressions.index = i;
-            printf("Leaving parse_expr...\n");
-            return expressions;
-        }
-
+void parse_num(my_arg *arg) {
+  tab_enter("parse_num", arg);
+  for (;arg->idx < strlen(arg->my_string); arg->idx++) {
+    if (!isdigit(arg->my_string[arg->idx])) {
+      break;
     }
-
-    expressions.index = i;
-    printf("Leaving parse_expr...\n");
-    return expressions;
-
+  }
+  tab_exit("parse_num", arg);
+  return;
 }
 
-
-int main(int argc, char *argv[])
-{
-
-    //struct index_expr result;
-
-    //result = parse_expr("(10+2)", 0);
-
-    char my_string[10000];
-
-    if (argc == 1){
-        //for use with echo "URL"
-        //TODO inifinite loop when no input...
-        fgets(my_string, sizeof(my_string) - 1, stdin);
-
-        if (!strcmp(&my_string[strlen(my_string)-1], "\n")){
-            my_string[strlen(my_string)-1] = 0; //remove newline character from fgets() at the end of string
-        }
-
-    } else {
-        //for standard use ./calc URL
-        strcpy(my_string, argv[1]);
-    }
-
-    parse_expr(my_string, 0);
+void parse_paren(my_arg *arg) {
+  tab_enter("parse_paren", arg);
+  if (arg->my_string[arg->idx] != '(') {
+    printf("Invalid parse!\n");
+    tab_exit("parse_paren", arg);
+    return;
+  }
+  arg->idx += 1;
+  parse_expr(arg);
+  if (arg->my_string[arg->idx] != ')') {
+    printf("Missing closing paren!\n");
+    tab_exit("parse_paren", arg);
+    return;
+  }
+  arg->idx += 1;
+  tab_exit("parse_paren", arg);
 }
 
+void parse_expr(my_arg *arg) {
+  tab_enter("parse_expr", arg);
+  while (arg->idx < strlen(arg->my_string)) {
+    char c = arg->my_string[arg->idx];
+    if (isdigit(c)) {
+      parse_num(arg);
+    } else if (c == '+' || c == '-' || c == '*' || c == '/') {
+      arg->idx += 1;
+    } else if (c == '(') {
+      parse_paren(arg);
+    } else if (c == ')') {
+      break;
+    }
+  }
+  tab_exit("parse_expr", arg);
+}
+
+int main(int argc, char *argv[]) {
+  my_arg arg;
+  if (argc == 1) {
+    fgets(arg.my_string, MAX_STR_SIZE-1, stdin);
+    arg.idx = 0;
+    int l = strlen(arg.my_string);
+    if (!strcmp(&arg.my_string[l-1], "\n")){
+      arg.my_string[l-1] = 0; //remove newline character from fgets() at the end of string
+    }
+  } else {
+    strcpy(arg.my_string, argv[1]);
+    arg.idx = 0;
+    printf("%p-%p\n", arg.my_string, arg.my_string + sizeof(arg.my_string));
+  }
+  parse_expr(&arg);
+}
