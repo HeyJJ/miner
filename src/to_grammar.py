@@ -6,14 +6,15 @@ def to_grammar(tree, grammar):
     node, children, _, _ = tree
     tokens = []
     if node not in grammar:
-        grammar["<%s>" % node] = set()
+        grammar[node] = set()
     for c in children:
         if c[1] == []:
             tokens.append(c[0])
         else:
             tokens.append("<%s>" % c[0])
             to_grammar(c, grammar)
-    grammar["<%s>" % node].add(''.join(tokens))
+    grammar[node].add(''.join(tokens))
+    return
 
 
 def merge_grammar(g1, g2):
