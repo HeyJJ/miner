@@ -35,24 +35,27 @@ clean:
 	python3 ./src/mine.py $<
 
 ## ----  DECOMPILE ---
-DAGGER=$(HOME)/Research/dagger/build/bin/llvm-dec
+DECOMPILER=$(HOME)/Research/dagger/build/bin/llvm-dec
 
 decompile_%: build/.%.decompiled; @echo done
 build/.%.decompiled: build/.%.original
-	$(DAGGER) build/$*/original > build/$*/dagger.ll
+	$(DECOMPILER) build/$*/original > build/$*/decompiled.ll
 	touch $@
 
 INPUTSTR="(1+23)+(123-43)/3*1"
 
-LLVM=$(HOME)/toolchains/llvm+clang-401-x86_64-apple-darwin17.7.0/bin/opt
-CLANG=$(HOME)/toolchains/llvm+clang-401-x86_64-apple-darwin17.7.0/bin/clang
+TOOLCHAIN=$(HOME)/toolchains/llvm+clang-401-x86_64-apple-darwin17.7.0
+LLVM=$(TOOLCHAIN)/bin/opt
+CLANG=$(TOOLCHAIN)/bin/clang
 LIBDIR=$(CHECKSUM_REPAIR)/install/lib
 INCDIR=$(CHECKSUM_REPAIR)/install/include
 TRACEPLUGIN=$(CHECKSUM_REPAIR)/build/debug/modules/trace-instr/libtraceplugin.dylib
 EXCLUDED_FUNCTIONS=$(CHECKSUM_REPAIR)/samples/excluded_functions
 
 ## ----  COMPILE ---
+original_%: build/.%.original; @echo done
 build/.%.original: subjects/%.c | build
+	mkdir -p build/$*
 	$(CLANG) -g -D_FORTIFY_SOURCE=0 -o build/$*/original -x c $< -ldl
 	touch $@
 
@@ -82,15 +85,15 @@ build/.%.instrumented: build/.%.metadata build/.%.uninstrumentedll | build
 run_%: build/.%.run; @echo done
 build/.%.run: build/.%.instrumented
 	echo $(INPUTSTR) | ./build/$*.instrumented
-	mv output build/$*.output
-	gzip -c build/$*.output > build/$*.output.gz
+	mv output build/$*/output
+	gzip -c build/$*/output > build/$*/output.gz
 	touch $@
 
 ## ---- OFFLINE TAINT ANALYSIS ---
 
 taint_%: build/.%.taint; @echo done
 build/.%.taint: build/.%.run
-	$(java) -cp "$(CHECKSUM_REPAIR)/install/lib/java/*" main.TaintTracker -me build/calc_parse/metadata -po build/$*.pygmalion.json -t build/$*.output.gz
+	$(java) -cp "$(CHECKSUM_REPAIR)/install/lib/java/*" main.TaintTracker -me build/calc_parse/metadata -po build/$*.pygmalion.json -t build/$*/output.gz
 	touch $@
 
 ## ---- OFFLINE CALL TRACE ---
@@ -100,7 +103,7 @@ build/.%.trace: build/.%.taint
 		| grep -v '"operator":"tokenstore"' \
 		| grep -v '"operator":"tokencomp"'\
 		| grep -v '"operator":"strlen"' \
-		| python3 ./src/converter.py $(INPUTSTR) > build/$*.call_trace.json
+		| python3 ./src/converter.py $(INPUTSTR) > build/$*/call_trace.json
 	touch $@
 
 
@@ -108,7 +111,7 @@ build/.%.trace: build/.%.taint
 
 mine_%: build/.%.mine; @echo done
 build/.%.mine: build/.%.trace
-	python3 ./src/mine.py build/$*.call_trace.json
+	python3 ./src/mine.py build/$*/call_trace.json
 	touch $@
 
 
@@ -119,8 +122,8 @@ backup:; cp build/calc_parse/uninstrumented.ll .uninstrumeted.ll
 
 restore: ; cp  .uninstrumeted.ll build/calc_parse/uninstrumented.ll
 
-dagger:
+reapply:
 	$(MAKE) decompile_calc_parse
-	cp build/calc_parse/dagger.ll build/calc_parse/uninstrumented.ll
+	cp build/calc_parse/decompiled.ll build/calc_parse/uninstrumented.ll
 	rm -f build/.calc_parse.instrumented
 	$(MAKE) mine_calc_parse
