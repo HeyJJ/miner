@@ -3,7 +3,7 @@ java=java
 .PHONY: trace mine
 
 PROJECTS=calc_parse
-T_UNINSTRUMENTED=$(addsuffix .uninstrumentedbc,$(PROJECTS))
+T_UNINSTRUMENTED=$(addsuffix .uninstrumentedll,$(PROJECTS))
 T_ORIGINAL=$(addsuffix .original,$(PROJECTS))
 T_INSTRUMENTED=$(addsuffix .instrumented,$(PROJECTS))
 T_BITCODE=$(addsuffix .metadata,$(PROJECTS))
@@ -39,13 +39,13 @@ DAGGER=$(HOME)/Research/dagger/build/bin/llvm-dec
 
 decompile_%: build/.%.decompiled; @echo done
 build/.%.decompiled: build/.%.original
-	$(DAGGER) build/$*/original > build/$*/dagger.bc
+	$(DAGGER) build/$*/original > build/$*/dagger.ll
 	touch $@
 
 INPUTSTR="(1+23)+(123-43)/3*1"
 
-LLVM=$(HOME)/toolchains/llvm+clang-401-x86_64-apple-darwin18.2.0/bin/opt
-CLANG=$(HOME)/toolchains/llvm+clang-401-x86_64-apple-darwin18.2.0/bin/clang
+LLVM=$(HOME)/toolchains/llvm+clang-401-x86_64-apple-darwin17.7.0/bin/opt
+CLANG=$(HOME)/toolchains/llvm+clang-401-x86_64-apple-darwin17.7.0/bin/clang
 LIBDIR=$(CHECKSUM_REPAIR)/install/lib
 INCDIR=$(CHECKSUM_REPAIR)/install/include
 TRACEPLUGIN=$(CHECKSUM_REPAIR)/build/debug/modules/trace-instr/libtraceplugin.dylib
@@ -57,24 +57,24 @@ build/.%.original: subjects/%.c | build
 	touch $@
 
 ## ---- GEN UNINSTRUMETED BITCODE -----
-ubc_%: build/.%.uninstrumentedbc; @echo done
-build/.%.uninstrumentedbc: subjects/%.c | build
+ull_%: build/.%.uninstrumentedll; @echo done
+build/.%.uninstrumentedll: subjects/%.c | build
 	mkdir -p build/$*
-	$(CLANG) -g -S -D_FORTIFY_SOURCE=0 -emit-llvm -include $(INCDIR)/traceinstr/wrapper_libc.h -o build/$*/uninstrumented.bc -x c $<
+	$(CLANG) -g -S -D_FORTIFY_SOURCE=0 -emit-llvm -include $(INCDIR)/traceinstr/wrapper_libc.h -o build/$*/uninstrumented.ll -x c $<
 	touch $@
 
 metadata%: build/.%.metadata; @echo done
-build/.%.metadata: build/.%.uninstrumentedbc
+build/.%.metadata: build/.%.uninstrumentedll
 	# extract metadata for taint analysis
-	$(CHECKSUM_REPAIR)/install/bin/extract_metadata -ef $(EXCLUDED_FUNCTIONS) -f build/$*/uninstrumented.bc
+	$(CHECKSUM_REPAIR)/install/bin/extract_metadata -ef $(EXCLUDED_FUNCTIONS) -f build/$*/uninstrumented.ll
 	touch $@
 
 ## ---- INSTRUMENT BITCODE-----
 instrument_%: build/.%.instrumented; @echo done
-build/.%.instrumented: build/.%.metadata build/.%.uninstrumentedbc | build
-	$(LLVM) -S -instnamer -reg2mem -load $(TRACEPLUGIN) -traceplugin -exclude_functions $(EXCLUDED_FUNCTIONS) -disable-verify build/$*/uninstrumented.bc -o  build/$*/opt_debug.bc
-	$(LLVM) -S -strip-debug build/$*/opt_debug.bc -o build/$*/debug.bc
-	$(CLANG) -fno-inline -O3 -o build/$*.instrumented build/$*/debug.bc -L$(LIBDIR) -lwrappermain -lwrapperlibc -lsimpletracer -ljson-c -lm -lz -ldl
+build/.%.instrumented: build/.%.metadata build/.%.uninstrumentedll | build
+	$(LLVM) -S -instnamer -reg2mem -load $(TRACEPLUGIN) -traceplugin -exclude_functions $(EXCLUDED_FUNCTIONS) -disable-verify build/$*/uninstrumented.ll -o  build/$*/opt_debug.ll
+	$(LLVM) -S -strip-debug build/$*/opt_debug.ll -o build/$*/debug.ll
+	$(CLANG) -fno-inline -O3 -o build/$*.instrumented build/$*/debug.ll -L$(LIBDIR) -lwrappermain -lwrapperlibc -lsimpletracer -ljson-c -lm -lz -ldl
 	touch $@
 
 ## ---- RUN -----
@@ -114,3 +114,13 @@ build/.%.mine: build/.%.trace
 
 ## ---------------------
 build: ; mkdir -p build
+## ---------------------
+backup:; cp build/calc_parse/uninstrumented.ll .uninstrumeted.ll
+
+restore: ; cp  .uninstrumeted.ll build/calc_parse/uninstrumented.ll
+
+dagger:
+	$(MAKE) decompile_calc_parse
+	cp build/calc_parse/dagger.ll build/calc_parse/uninstrumented.ll
+	rm -f build/.calc_parse.instrumented
+	$(MAKE) mine_calc_parse
