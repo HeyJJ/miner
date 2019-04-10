@@ -44,11 +44,7 @@ if __name__ == "__main__":
     with Tracer.Tracer(mystring, restrict) as tracer:
         parse_expr(tracer())
     assert tracer.inputstr.comparisons
-    with open('comparisons.json', 'w+') as f:
-        f.write(json.dumps(Tracer.convert_comparisons(tracer.inputstr.comparisons)))
-        #f.write(json.dumps(tracer.inputstr.comparisons))
-    with open('method_map.json', 'w+') as f:
-        f.write(json.dumps(Tracer.convert_method_map(tracer.method_map)))
-        #f.write(json.dumps(tracer.method_map))
-    with open('inputstr.json', 'w+') as f:
-        f.write(json.dumps(str(tracer.inputstr)))
+    print(json.dumps({
+        'comparisons':Tracer.convert_comparisons(tracer.inputstr.comparisons),
+        'method_map': Tracer.convert_method_map(tracer.method_map),
+        'inputstr': str(tracer.inputstr)}))
