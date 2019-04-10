@@ -5,7 +5,7 @@ def all_terminals(tree):
     if len(children) == 0: return symbol
     return ''.join([all_terminals(c) for c in children])
 
-class GrammarFuzzer:
+class MinGen:
     def __init__(self, grammar, start_symbol='<START>', log=False):
         self.grammar, self.start_symbol = grammar, start_symbol
 
@@ -58,13 +58,14 @@ class GrammarFuzzer:
             tree = self.expand_tree_once(tree)
         return tree
 
-    def fuzz_tree(self): return self.expand_tree((self.start_symbol, None))
-    def fuzz(self): return all_terminals(self.fuzz_tree())
+    def gen_tree(self): return self.expand_tree((self.start_symbol, None))
+    def gen(self): return all_terminals(self.gen_tree())
 
 import json, sys, random
-def main(gf, start):
-    gf = GrammarFuzzer(json.load(open(gf)), start_symbol=start)
-    print(gf.fuzz())
+
+def mingen(gf, start):
+    gf = MinGen(json.load(open(gf)), start_symbol=start)
+    return gf.gen()
 
 if __name__ == '__main__':
-    main(sys.argv[1], sys.argv[2] if len(sys.argv) > 2 else '<START>')
+    print(mingen(sys.argv[1], sys.argv[2] if len(sys.argv) > 2 else '<START>'))
