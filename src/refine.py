@@ -26,9 +26,14 @@ def gen_alt(arr):
     my_lst = []
     length = len(arr)
     # alpha_1 != e and alpha_2 != e
-    if length == 1:
-        my_lst.append((arr, arr[0]))
-        return my_lst
+    if length:
+        if length == 1:
+            my_lst.append((arr, '%s' % ''.join(arr)))
+            return my_lst
+        elif length > 1:
+            my_lst.append((arr, '\(%s\)' % ''.join(arr)))
+        else:
+            assert False
     for i in range(1,length): # shorter alpha_1 prioritized
         alpha_1 = arr[:i]
         alpha_2 = arr[i:]
@@ -48,6 +53,11 @@ def gen_rep(arr):
     sys.stdout.flush()
     my_lst = []
     length = len(arr)
+    if length:
+        if length == 1:
+            my_lst.append((arr, '\(%s\)' % ''.join(arr)))
+        else:
+            my_lst.append((arr, '%s' % ''.join(arr)))
     for i in range(length): # shorter alpha1 prioritized
         alpha_1 = arr[:i]
         alpha_1_s = ''.join(alpha_1)
@@ -97,6 +107,7 @@ def main(tree_file, rule, alt):
     # alternatives.
     my_rule = grammar[rule]
     my_alt = sorted(my_rule)[alt]
+    print(my_alt, file=sys.stderr)
     lres = gen_rep(my_alt)
     #
     sys.stdout.flush()
@@ -112,7 +123,6 @@ def main(tree_file, rule, alt):
     for k in regex_map:
         if regex_map[k]:
             print(k)
-    print(my_alt)
     #put it back into tree
 
 import mingen
