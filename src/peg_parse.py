@@ -69,9 +69,7 @@ if __name__ == "__main__":
     with Tracer.Tracer(mystring, restrict) as tracer:
         unify_key(C_VG, '<start>', tracer())
     assert tracer.inputstr.comparisons
-    with open('comparisons.json', 'w+') as f:
-        f.write(json.dumps(Tracer.convert_comparisons(tracer.inputstr.comparisons)))
-    with open('method_map.json', 'w+') as f:
-        f.write(json.dumps(Tracer.convert_method_map(tracer.method_map)))
-    with open('inputstr.json', 'w+') as f:
-        f.write(json.dumps(str(tracer.inputstr)))
+    print(json.dumps({
+            'inputstr':str(tracer.inputstr),
+            'method_map':Tracer.convert_method_map(tracer.method_map),
+            'comparisons':Tracer.convert_comparisons(tracer.inputstr.comparisons)}))
