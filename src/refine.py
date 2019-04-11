@@ -22,7 +22,6 @@ def check(s):
         return False
 
 def gen_alt(arr):
-    print('2')
     sys.stdout.flush()
     my_lst = []
     length = len(arr)
@@ -46,7 +45,6 @@ def gen_alt(arr):
 
 # returns a list.
 def gen_rep(arr):
-    print('1')
     sys.stdout.flush()
     my_lst = []
     length = len(arr)
@@ -98,10 +96,9 @@ def main(tree_file, rule, alt):
     # as expected). Do this for each alternative, and we have the list of actual
     # alternatives.
     my_rule = grammar[rule]
-    my_alt = list(my_rule)[alt]
+    my_alt = sorted(my_rule)[alt]
     lres = gen_rep(my_alt)
-    sys.stdout.flush()
-    print('_%d' % len(lres))
+    #
     sys.stdout.flush()
     for l,s in lres:
         expr = to_string(flatten(l))
@@ -115,6 +112,7 @@ def main(tree_file, rule, alt):
     for k in regex_map:
         if regex_map[k]:
             print(k)
+    print(my_alt)
     #put it back into tree
 
 import mingen
@@ -130,4 +128,4 @@ def get_grammar(tree): return to_grammar.to_grammar(tree, {})
 
 import to_grammar
 if __name__ == '__main__':
-    main(sys.argv[1], rule=(sys.argv[2] if len(sys.argv) > 2 else None), alt=(sys.argv[3] if len(sys.argv) > 3 else 0))
+    main(sys.argv[1], rule=(sys.argv[2] if len(sys.argv) > 2 else None), alt=(int(sys.argv[3]) if len(sys.argv) > 3 else 0))
