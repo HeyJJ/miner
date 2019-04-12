@@ -5,7 +5,18 @@ import sys
 import itertools
 
 import mingen
-def to_map(tree, map_str, grammar):
+import to_grammar
+
+def get_grammar(tree):
+    """ Make sure that the grammar we derive from the tree is deterministic"""
+    g = to_grammar.to_grammar(tree, {})
+    return {k:sorted(g[k]) for k in g}
+
+def generate_expansion_db(tree, map_str, grammar):
+    """
+    Generate a database of possible expansions for each non terminal from
+    the given derivation tree, and store it in map_str
+    """
     node, children, *_ = tree
     if node in grammar:
         if node not in map_str:
@@ -14,16 +25,8 @@ def to_map(tree, map_str, grammar):
             map_str[node].add(mingen.all_terminals(tree))
 
     for c in children:
-        to_map(c, map_str, grammar)
+        generate_expansion_db(c, map_str, grammar)
     return map_str
-
-def get_grammar(tree):
-    g = to_grammar.to_grammar(tree, {})
-    return {k:sorted(g[k]) for k in g}
-
-
-def t(a): return ''.join([str(s) for s in a])
-def flatten(arr): return [i for x in arr for i in (flatten(x) if isinstance(x, (list, tuple)) else [x])]
 
 def tree_to_str(node, nt, expansion):
     """Reconstruct the tree replacing nt with expansion"""
@@ -32,9 +35,6 @@ def tree_to_str(node, nt, expansion):
     else:
         if not children: return node
         else: return ''.join(tree_to_str(c, nt, expansion) for c in children)
-
-import pudb
-brk = pudb.set_trace
 
 def to_strings(nt, regex, tree):
     """
@@ -49,7 +49,7 @@ def to_strings(nt, regex, tree):
             expansion = ''.join(lst)
             yield tree_to_str(tree, nt, expansion)
 
-import calc_parse_
+import calc_parse_ # does not have the .in_ construction for taints.
 
 exec_map = {}
 def check(s):
@@ -206,11 +206,10 @@ def main(tree_file, nt, alt):
                 print(i,j,k, ' '.join(["%d:%s" % (i,t) for i,t in enumerate(a)]))
             print()
         return
-    to_map(tree, str_db, grammar)
+    generate_expansion_db(tree, str_db, grammar)
     sys.stdout.flush()
     #for i in str_db: print(i, str_db[i])
     process_grammar(grammar, tree)
 
-import to_grammar
 if __name__ == '__main__':
     main(sys.argv[1], nt=(sys.argv[2] if len(sys.argv) > 2 else None), alt=(int(sys.argv[3]) if len(sys.argv) > 3 else -1))
