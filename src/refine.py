@@ -99,20 +99,9 @@ def gen_rep(arr, start, end):
     return my_lst
 
 str_db = {}
-
 regex_map = {}
-def main(tree_file, nt, alt):
-    tree = json.load(open(tree_file))
-    grammar = get_grammar(tree)
-    if nt is None:
-        for i, k in enumerate(grammar):
-            for j,a in enumerate(grammar[k]):
-                print(i,j,k, ' '.join(["%d:%s" % (i,t) for i,t in enumerate(a)]))
-            print()
-        return
-    to_map(tree, str_db, grammar)
-    #for i in str_db: print(i, str_db[i])
-    sys.stdout.flush()
+
+def process_alt(nt, my_alt, tree):
     # the idea is as follows: We choose a single nt to refine, and a single
     # alternative at a time.
     # Then, consider that single alternative as a sting, with each token a
@@ -122,11 +111,7 @@ def main(tree_file, nt, alt):
     # the string is accepted (adv: verify that the derivation tree is
     # as expected). Do this for each alternative, and we have the list of actual
     # alternatives.
-    my_rule = grammar[nt]
-    my_alt = sorted(my_rule)[alt]
-    print(my_alt, file=sys.stderr)
     lres = gen_rep(my_alt, start=0, end=len(my_alt)-1)
-    #
     sys.stdout.flush()
     for l,s in lres:
         expr = to_string(nt, flatten(l), tree)
@@ -139,8 +124,35 @@ def main(tree_file, nt, alt):
 
     for k in regex_map:
         if regex_map[k]:
-            print(k)
-    #put it back into tree
+            print('->        ', k)
+    print('')
+    regex_map.clear()
+
+def process_rule(nt, my_rule, tree):
+    for alt in my_rule:
+        print("->    ", alt)
+        process_alt(nt, alt, tree)
+    print('-'*10)
+
+def process_grammar(grammar, tree):
+    for nt in grammar:
+        print("->", nt)
+        my_rule = grammar[nt]
+        process_rule(nt, my_rule, tree)
+
+def main(tree_file, nt, alt):
+    tree = json.load(open(tree_file))
+    grammar = get_grammar(tree)
+    if nt is '':
+        for i, k in enumerate(grammar):
+            for j,a in enumerate(grammar[k]):
+                print(i,j,k, ' '.join(["%d:%s" % (i,t) for i,t in enumerate(a)]))
+            print()
+        return
+    to_map(tree, str_db, grammar)
+    sys.stdout.flush()
+    #for i in str_db: print(i, str_db[i])
+    process_grammar(grammar, tree)
 
 import mingen
 def to_map(tree, map_str, grammar):
@@ -151,8 +163,10 @@ def to_map(tree, map_str, grammar):
         to_map(c, map_str, grammar)
     return map_str
 
-def get_grammar(tree): return to_grammar.to_grammar(tree, {})
+def get_grammar(tree):
+    g = to_grammar.to_grammar(tree, {})
+    return {k:sorted(g[k]) for k in g}
 
 import to_grammar
 if __name__ == '__main__':
-    main(sys.argv[1], nt=(sys.argv[2] if len(sys.argv) > 2 else None), alt=(int(sys.argv[3]) if len(sys.argv) > 3 else 0))
+    main(sys.argv[1], nt=(sys.argv[2] if len(sys.argv) > 2 else None), alt=(int(sys.argv[3]) if len(sys.argv) > 3 else -1))
