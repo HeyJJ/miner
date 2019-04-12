@@ -33,18 +33,21 @@ def tree_to_str(node, nt, expansion):
         if not children: return node
         else: return ''.join(tree_to_str(c, nt, expansion) for c in children)
 
-def to_strings(nt, rule, tree):
+import pudb
+brk = pudb.set_trace
+
+def to_strings(nt, regex, tree):
     """
     Given a token, and its corresponding rule, first obtain the expansion
     string by replacing all tokens with candidates, then reconstruct the string
     from the derivation tree by recursively traversing and replacing any node
     that corresponds to nt with the expanded string.
     """
-    # could be an array depending on how many combinations we get for rule TODO
-    arr = [list(str_db.get(token, [token])) for token in rule]
-    for lst in itertools.product(*arr):
-        expansion = ''.join(lst)
-        yield tree_to_str(tree, nt, expansion)
+    for rule in regex_to_rules(regex):
+        arr = [list(str_db.get(token, [token])) for token in rule]
+        for lst in itertools.product(*arr):
+            expansion = ''.join(lst)
+            yield tree_to_str(tree, nt, expansion)
 
 import calc_parse_
 
@@ -60,61 +63,93 @@ def check(s):
         exec_map[s] = False
         return False
 
-def gen_alt(arr, start, end):
-    sys.stdout.flush()
+def gen_alt(arr):
     length = len(arr)
     # alpha_1 != e and alpha_2 != e
     for i in range(1,length): # shorter alpha_1 prioritized
-        alpha_1 = arr[:i]
-        alpha_2 = arr[i:]
+        alpha_1, alpha_2 = arr[:i], arr[i:]
         assert alpha_1
         assert alpha_2
-        a1_rep = gen_rep(alpha_1, start=start, end=start+i-1)
-        a2_alt = gen_alt(alpha_2, start=start+i, end=start+len(arr)-1)
-        for a1, a1_s in a1_rep:
-            for a2, a2_s in a2_alt:
-                key = '\(%s\|%s\)' % (a1_s, a2_s)
-                yield (a1, key)
-                yield (a2, key)
-
+        for a1 in gen_rep(alpha_1):
+            for a2 in gen_alt(alpha_2):
+                yield alt(a1, a2)
     if length: # this is the final choice.
-        if length == 1:
-            yield (arr, '%s' % ''.join(arr) )
-        else:
-            yield (arr, '\(%s\)' % ''.join(arr) )
+        yield arr
     return
 
-# returns a list.
-def gen_rep(arr, start, end):
+def alt(a1, a2): return (0, a1, a2)
+def rep(a): return (1, a)
+def seq(*arr): return tuple([2, *arr])
+
+
+def regex_to_rules(regex):
+    if regex[0] == 0: # alt
+        _, a, b = regex
+        for a1 in regex_to_rules(a):
+            yield a1
+        for b1 in regex_to_rules(b):
+            yield b1
+    elif regex[0] == 1: # rep
+        _, a = regex
+        for a3 in regex_to_rules(a):
+            for n in [0, 1, 2]:
+                yield a3 * n
+    elif regex[0] == 2: # seq
+        _, *arr = regex
+        if arr[0]:
+            for a4 in regex_to_rules(arr[0]):
+                if arr[1:]:
+                    for a5 in regex_to_rules((2, *arr[1:])):
+                        yield a4 + a5
+                else:
+                    yield a4
+        else:
+            for a5 in regex_to_rules((2, *arr[1:])):
+                yield a5
+
+    else:
+        yield regex
+
+
+def regex_to_string(regex):
+    if not regex: return ''
+    if len(regex) == 1: return regex[0]
+    elif regex[0] == 0: # alt
+        _, a, b = regex
+        return "\(%s\)" % (regex_to_string(a) + '\|' + regex_to_string(b))
+    elif regex[0] == 1: # rep
+        _, a = regex
+        return "\(%s\)" % (regex_to_string(a) + '\*')
+    elif regex[0] == 2: # seq
+        _, *arr = regex
+        if len(arr) == 1:
+            return "%s" % regex_to_string(arr[1])
+        else:
+            return "\(%s\)" % ''.join([regex_to_string(a) for a in arr])
+    else:
+        return "\(%s\)" % ''.join(regex)
+
+def gen_rep(arr):
     length = len(arr)
     for i in range(length): # shorter alpha1 prioritized
         alpha_1 = arr[:i]
-        alpha_1_s = ''.join(alpha_1)
         # alpha_2 != e
-        for j in (range(i+1, length+1)): # longer alpha2 prioritized
-            alpha_2 = arr[i:j]
+        for j in range(i+1, length+1): # longer alpha2 prioritized
+            alpha_2, alpha_3 = arr[i:j], arr[j:]
             assert alpha_2
-            alpha_3 = arr[j:]
-            for a2, a2_s in gen_alt(alpha_2, start=start+i, end=start+j-1):
-                has = False
-                for a3, a3_s in gen_rep(alpha_3, start=start+j, end=start+length-1):
-                    has = True
-                    for n in [0, 1, 2]:
-                        yield ((alpha_1, a2 * n, a3), '\(%s%s\*%s\)' % (alpha_1_s, a2_s, a3_s))
-                if not has:
-                    for n in [0, 1, 2]:
-                        yield (alpha_1, a2 * n), '\(%s%s\*\)' % (alpha_1_s, a2_s)
+            for a2 in gen_alt(alpha_2):
+                for a3 in gen_rep(alpha_3):
+                    yield seq(alpha_1, rep(a2), a3)
+                if not alpha_3:
+                    yield seq(alpha_1, rep(a2))
     if length: # the final choice
-        if length == 1:
-            yield (arr, '\(%s\)' % ''.join(arr))
-        else:
-            yield (arr, '%s' % ''.join(arr))
-
+        yield arr
     return
 
 str_db = {}
 regex_map = {}
 final_regex_map = {}
+
 
 def process_alt(nt, my_alt, tree):
     # the idea is as follows: We choose a single nt to refine, and a single
@@ -126,38 +161,43 @@ def process_alt(nt, my_alt, tree):
     # the string is accepted (adv: verify that the derivation tree is
     # as expected). Do this for each alternative, and we have the list of actual
     # alternatives.
-    for l,s in gen_rep(my_alt, start=0, end=len(my_alt)-1):
-        for expr in to_strings(nt, flatten(l), tree):
-            if regex_map.get(s, False):
+    for regex in gen_rep(my_alt):
+        all_true = False
+        for expr in to_strings(nt, regex, tree):
+            if regex_map.get(regex, False):
                 v = check(expr)
-                regex_map[s] = v
-            elif s not in regex_map:
+                regex_map[regex] = v
+                if not v:
+                    break # one sample of regex failed. Exit
+            elif regex not in regex_map:
                 v = check(expr)
-                regex_map[s] = v
+                regex_map[regex] = v
+                if not v: break # one sample of regex failed. Exit
+            all_true = True
+        if all_true: # get the first
+            print("nt:", nt, 'rule:', regex_to_string(regex))
+            break
 
     for k in regex_map:
         if regex_map[k]:
-            print('->        ', k)
+            print('->        ', regex_to_string(k))
     print('')
-    for k in regex_map:
-        if k not in final_regex_map:
-            final_regex_map[k] = regex_map[k]
-        else:
-            if not regex_map[k]:
-                final_regex_map[k] = False
     regex_map.clear()
+    sys.stdout.flush()
 
 def process_rule(nt, my_rule, tree):
     for alt in my_rule:
         print("->    ", alt)
         process_alt(nt, alt, tree)
     print('-'*10)
+    sys.stdout.flush()
 
 def process_grammar(grammar, tree):
     for nt in grammar:
         print("->", nt)
         my_rule = grammar[nt]
         process_rule(nt, my_rule, tree)
+    sys.stdout.flush()
 
 def main(tree_file, nt, alt):
     tree = json.load(open(tree_file))
