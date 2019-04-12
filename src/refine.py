@@ -1,6 +1,26 @@
 #!/usr/bin/env python
 import json
+import random
 import sys
+import itertools
+
+import mingen
+def to_map(tree, map_str, grammar):
+    node, children, *_ = tree
+    if node in grammar:
+        if node not in map_str:
+            map_str[node] = {mingen.all_terminals(tree)}
+        else:
+            map_str[node].add(mingen.all_terminals(tree))
+
+    for c in children:
+        to_map(c, map_str, grammar)
+    return map_str
+
+def get_grammar(tree):
+    g = to_grammar.to_grammar(tree, {})
+    return {k:sorted(g[k]) for k in g}
+
 
 def t(a): return ''.join([str(s) for s in a])
 def flatten(arr): return [i for x in arr for i in (flatten(x) if isinstance(x, (list, tuple)) else [x])]
@@ -13,16 +33,18 @@ def tree_to_str(node, nt, expansion):
         if not children: return node
         else: return ''.join(tree_to_str(c, nt, expansion) for c in children)
 
-def to_string(nt, rule, tree):
+def to_strings(nt, rule, tree):
     """
     Given a token, and its corresponding rule, first obtain the expansion
     string by replacing all tokens with candidates, then reconstruct the string
     from the derivation tree by recursively traversing and replacing any node
     that corresponds to nt with the expanded string.
     """
-    # could be an array depending on how many combinations we get for rule
-    expansion = ''.join([str_db.get(a, a) for a in rule]) 
-    return tree_to_str(tree, nt, expansion)
+    # could be an array depending on how many combinations we get for rule TODO
+    arr = [list(str_db.get(token, [token])) for token in rule]
+    for lst in itertools.product(*arr):
+        expansion = ''.join(lst)
+        yield tree_to_str(tree, nt, expansion)
 
 import calc_parse_
 
@@ -100,6 +122,7 @@ def gen_rep(arr, start, end):
 
 str_db = {}
 regex_map = {}
+final_regex_map = {}
 
 def process_alt(nt, my_alt, tree):
     # the idea is as follows: We choose a single nt to refine, and a single
@@ -114,18 +137,24 @@ def process_alt(nt, my_alt, tree):
     lres = gen_rep(my_alt, start=0, end=len(my_alt)-1)
     sys.stdout.flush()
     for l,s in lres:
-        expr = to_string(nt, flatten(l), tree)
-        if regex_map.get(s, False):
-            v = check(expr)
-            regex_map[s] = v
-        elif s not in regex_map:
-            v = check(expr)
-            regex_map[s] = v
+        for expr in to_strings(nt, flatten(l), tree):
+            if regex_map.get(s, False):
+                v = check(expr)
+                regex_map[s] = v
+            elif s not in regex_map:
+                v = check(expr)
+                regex_map[s] = v
 
     for k in regex_map:
         if regex_map[k]:
             print('->        ', k)
     print('')
+    for k in regex_map:
+        if k not in final_regex_map:
+            final_regex_map[k] = regex_map[k]
+        else:
+            if not regex_map[k]:
+                final_regex_map[k] = False
     regex_map.clear()
 
 def process_rule(nt, my_rule, tree):
@@ -153,19 +182,6 @@ def main(tree_file, nt, alt):
     sys.stdout.flush()
     #for i in str_db: print(i, str_db[i])
     process_grammar(grammar, tree)
-
-import mingen
-def to_map(tree, map_str, grammar):
-    node, children, *_ = tree
-    if node not in map_str and node in grammar:
-        map_str[node] = mingen.all_terminals(tree)
-    for c in children:
-        to_map(c, map_str, grammar)
-    return map_str
-
-def get_grammar(tree):
-    g = to_grammar.to_grammar(tree, {})
-    return {k:sorted(g[k]) for k in g}
 
 import to_grammar
 if __name__ == '__main__':
