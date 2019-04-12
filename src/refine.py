@@ -203,18 +203,21 @@ def process_alt(nt, my_alt, tree):
     regex_map.clear()
     sys.stdout.flush()
 
-def process_rule(nt, my_rule, tree):
+def process_rule(nt, my_rule, tree, new_rule):
     for alt in my_rule:
         regex = process_alt(nt, alt, tree)
         print("->    ", str(regex))
+        new_rule.append(str(regex))
     print('-'*10)
     sys.stdout.flush()
 
-def process_grammar(grammar, tree):
+def process_grammar(grammar, tree, new_grammar):
     for nt in grammar:
         print("->", nt)
         my_rule = grammar[nt]
-        process_rule(nt, my_rule, tree)
+        new_rule = []
+        new_grammar[nt] = new_rule
+        process_rule(nt, my_rule, tree, new_rule)
     sys.stdout.flush()
 
 def main(tree_file, nt, alt):
@@ -229,7 +232,9 @@ def main(tree_file, nt, alt):
     generate_expansion_db(tree, str_db, grammar)
     sys.stdout.flush()
     #for i in str_db: print(i, str_db[i])
-    process_grammar(grammar, tree)
+    new_grammar = {}
+    process_grammar(grammar, tree, new_grammar)
+    print(new_grammar)
 
 if __name__ == '__main__':
     main(sys.argv[1], nt=(sys.argv[2] if len(sys.argv) > 2 else None), alt=(int(sys.argv[3]) if len(sys.argv) > 3 else -1))
