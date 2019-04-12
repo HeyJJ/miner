@@ -38,30 +38,46 @@ def tree_to_str(node, nt, expansion):
 
 def to_strings(nt, regex, tree):
     """
-    Given a token, and its corresponding rule, first obtain the expansion
-    string by replacing all tokens with candidates, then reconstruct the string
-    from the derivation tree by recursively traversing and replacing any node
-    that corresponds to nt with the expanded string.
-    """
+    We are given the toekn, and the regex that is being checked to see if it
+    is the correct abstraction. Hence, we first generate all possible rules
+    that can result from this regex.
+    The complication is that str_db contains multiple alternative strings for
+    each token. Hence, we have to generate a combination of all these strings
+    and try to check.
+   """
     for rule in regex.to_rules():
-        arr = [list(str_db.get(token, [token])) for token in rule]
-        for lst in itertools.product(*arr):
+        exp_lst_of_lsts = [list(str_db.get(token, [token])) for token in rule]
+        for lst in exp_lst_of_lsts: assert lst
+        for lst in itertools.product(*exp_lst_of_lsts):
+            """
+            We first obtain the expansion string by replacing all tokens with
+            candidates, then reconstruct the string from the derivation tree by
+            recursively traversing and replacing any node that corresponds to nt
+            with the expanded string.
+            """
             expansion = ''.join(lst)
+            #print("Expansion %s:\tregex:%s" % (repr(expansion), str(regex)))
             yield tree_to_str(tree, nt, expansion)
 
 import calc_parse_ # does not have the .in_ construction for taints.
 
 exec_map = {}
-def check(s):
-    if s in exec_map:
-        return exec_map[s]
+def check(s, label):
+    if s in exec_map: return exec_map[s]
+    v =  _check(s)
+    #print("\t\t", repr(s), v, ' from: %s' % str(label))
+    exec_map[s] = v
+    return v
+
+def _check(s):
     try:
         calc_parse_.parse_expr(s)
-        exec_map[s] = True
         return True
     except:
-        exec_map[s] = False
         return False
+
+# What samples to use for a{n} to conirm that a* is a valid regex.
+SAMPLES_FOR_REP = [0, 1, 2]
 
 class Regex:
     def to_rules(self):
@@ -72,19 +88,16 @@ class Regex:
                 yield a2
         elif  isinstance(self, Rep):
             for a3 in self.a.to_rules():
-                for n in [0, 1, 2]:
+                for n in SAMPLES_FOR_REP:
                     yield a3 * n
         elif  isinstance(self, Seq):
-            if not self.arr: return
-            if self.arr[0]:
-                for a4 in self.arr[0].to_rules():
+            for a4 in self.arr[0].to_rules():
+                if self.arr[1:]:
                     for a5 in Seq(self.arr[1:]).to_rules():
                         yield a4 + a5
-                    if not self.arr[1:]:
-                        yield a4
-            else:
-                for a6 in Seq(self.arr[1:]).to_rules():
-                    yield a6
+                else:
+                    yield a4
+
         elif  isinstance(self, One):
             assert not isinstance(One, Regex)
             yield self.o
@@ -95,9 +108,12 @@ class Regex:
         if isinstance(self, Alt):
             return "(%s|%s)" % (str(self.a1), str(self.a2))
         elif  isinstance(self, Rep):
-            return "%s*" % self.a
+            return "(%s)*" % self.a
         elif  isinstance(self, Seq):
-            return "%s" % ''.join(str(a) for a in self.arr)
+            if len(self.arr) == 1:
+                return "(%s)" % ''.join(str(a) for a in self.arr)
+            else:
+                return "(%s)" % ''.join(str(a) for a in self.arr)
         elif  isinstance(self, One):
             return ''.join(str(o).replace('*', '[*]').replace('(', '[(]').replace(')', '[)]') for o in self.o)
         else:
@@ -163,18 +179,22 @@ def process_alt(nt, my_alt, tree):
         all_true = False
         for expr in to_strings(nt, regex, tree):
             if regex_map.get(regex, False):
-                v = check(expr)
+                v = check(expr, regex)
                 regex_map[regex] = v
-                if not v:
+                if not v: # this regex failed
+                    all_true = False
                     break # one sample of regex failed. Exit
             elif regex not in regex_map:
-                v = check(expr)
+                v = check(expr, regex)
                 regex_map[regex] = v
-                if not v: break # one sample of regex failed. Exit
+                if not v: # this regex failed.
+                    all_true = False
+                    break # one sample of regex failed. Exit
             all_true = True
-        if all_true: # get the first
-            print("nt:", nt, 'rule:', str(regex))
-            break
+        if all_true: # get the first regex that covers all samples.
+            #print("nt:", nt, 'rule:', str(regex))
+            return regex
+    return None
 
     for k in regex_map:
         if regex_map[k]:
@@ -185,8 +205,8 @@ def process_alt(nt, my_alt, tree):
 
 def process_rule(nt, my_rule, tree):
     for alt in my_rule:
-        print("->    ", alt)
-        process_alt(nt, alt, tree)
+        regex = process_alt(nt, alt, tree)
+        print("->    ", str(regex))
     print('-'*10)
     sys.stdout.flush()
 
