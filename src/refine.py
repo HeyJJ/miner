@@ -106,12 +106,8 @@ def gen_rep(arr, start, end):
                     if a3_rep:
                         for a3, a3_s in a3_rep:
                             my_lst.append(((alpha_1, a2 * n, a3), '\(%s%s\*%s\)' % (alpha_1_s, a2_s, a3_s)))
-                            if n != 0:
-                                my_lst.append(((alpha_1, a2 * n, a3), '\(%s%s\+%s\)' % (alpha_1_s, a2_s, a3_s) ))
                     else:
                         my_lst.append(((alpha_1, a2 * n), '\(%s%s\*\)' % (alpha_1_s, a2_s)))
-                        if n != 0:
-                            my_lst.append(((alpha_1, a2 * n), '\(%s%s\+\)' % (alpha_1_s, a2_s)))
     if length: # the final choice
         if length == 1:
             my_lst.append((arr, '\(%s\)' % ''.join(arr)))
