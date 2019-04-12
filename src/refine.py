@@ -62,7 +62,6 @@ def check(s):
 
 def gen_alt(arr, start, end):
     sys.stdout.flush()
-    my_lst = []
     length = len(arr)
     # alpha_1 != e and alpha_2 != e
     for i in range(1,length): # shorter alpha_1 prioritized
@@ -75,21 +74,18 @@ def gen_alt(arr, start, end):
         for a1, a1_s in a1_rep:
             for a2, a2_s in a2_alt:
                 key = '\(%s\|%s\)' % (a1_s, a2_s)
-                my_lst.append((a1, key))
-                my_lst.append((a2, key))
+                yield (a1, key)
+                yield (a2, key)
 
     if length: # this is the final choice.
         if length == 1:
-            assert not my_lst
-            my_lst.append((arr, '%s' % ''.join(arr) ))
-            return my_lst
-        my_lst.append((arr, '\(%s\)' % ''.join(arr) ))
-    return my_lst
+            yield (arr, '%s' % ''.join(arr) )
+        else:
+            yield (arr, '\(%s\)' % ''.join(arr) )
+    return
 
 # returns a list.
 def gen_rep(arr, start, end):
-    sys.stdout.flush()
-    my_lst = []
     length = len(arr)
     for i in range(length): # shorter alpha1 prioritized
         alpha_1 = arr[:i]
@@ -99,22 +95,22 @@ def gen_rep(arr, start, end):
             alpha_2 = arr[i:j]
             assert alpha_2
             alpha_3 = arr[j:]
-            a2_alt = gen_alt(alpha_2, start=start+i, end=start+j-1) # we need to check multiples 0, 1, 2.
-            a3_rep = gen_rep(alpha_3, start=start+j, end=start+length-1)
-            for n in [0, 1, 2]:
-                for a2, a2_s in a2_alt:
-                    if a3_rep:
-                        for a3, a3_s in a3_rep:
-                            my_lst.append(((alpha_1, a2 * n, a3), '\(%s%s\*%s\)' % (alpha_1_s, a2_s, a3_s)))
-                    else:
-                        my_lst.append(((alpha_1, a2 * n), '\(%s%s\*\)' % (alpha_1_s, a2_s)))
+            for a2, a2_s in gen_alt(alpha_2, start=start+i, end=start+j-1):
+                has = False
+                for a3, a3_s in gen_rep(alpha_3, start=start+j, end=start+length-1):
+                    has = True
+                    for n in [0, 1, 2]:
+                        yield ((alpha_1, a2 * n, a3), '\(%s%s\*%s\)' % (alpha_1_s, a2_s, a3_s))
+                if not has:
+                    for n in [0, 1, 2]:
+                        yield (alpha_1, a2 * n), '\(%s%s\*\)' % (alpha_1_s, a2_s)
     if length: # the final choice
         if length == 1:
-            my_lst.append((arr, '\(%s\)' % ''.join(arr)))
+            yield (arr, '\(%s\)' % ''.join(arr))
         else:
-            my_lst.append((arr, '%s' % ''.join(arr)))
+            yield (arr, '%s' % ''.join(arr))
 
-    return my_lst
+    return
 
 str_db = {}
 regex_map = {}
@@ -130,9 +126,7 @@ def process_alt(nt, my_alt, tree):
     # the string is accepted (adv: verify that the derivation tree is
     # as expected). Do this for each alternative, and we have the list of actual
     # alternatives.
-    lres = gen_rep(my_alt, start=0, end=len(my_alt)-1)
-    sys.stdout.flush()
-    for l,s in lres:
+    for l,s in gen_rep(my_alt, start=0, end=len(my_alt)-1):
         for expr in to_strings(nt, flatten(l), tree):
             if regex_map.get(s, False):
                 v = check(expr)
