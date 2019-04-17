@@ -35,8 +35,7 @@ def process(files):
         g = to_grammar(tree, {})
         final_grammar = merge_grammar(final_grammar, g)
     assert len(start) == 1
-    return final_grammar
-    #return dict(**{'<START>': [("<%s>" % start.pop(),)]}, **{"<%s>" % k:[a for a in v] for k,v in final_grammar.items()})
+    return {k:list(v) for k,v in final_grammar.items()}
 
 if __name__ == '__main__':
     g = process(sys.argv[1:])
