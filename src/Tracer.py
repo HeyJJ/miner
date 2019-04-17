@@ -1,6 +1,9 @@
 from InformationFlow import ctstr
 
 CURRENT_METHOD = None
+METHOD_NUM_STACK = []
+METHOD_MAP = {}
+METHOD_NUM = 0
 
 def get_current_method():
     return CURRENT_METHOD
@@ -9,6 +12,42 @@ def set_current_method(method, stack_depth, mid):
     global CURRENT_METHOD
     CURRENT_METHOD = (method, stack_depth, mid)
     return CURRENT_METHOD
+
+def trace_init():
+    global CURRENT_METHOD
+    global METHOD_NUM_STACK
+    global METHOD_MAP
+    global METHOD_NUM
+    CURRENT_METHOD = None
+    METHOD_NUM_STACK.clear()
+    METHOD_MAP.clear()
+    METHOD_NUM = 0
+
+    start = (METHOD_NUM, None, [])
+    METHOD_NUM_STACK.append(start)
+    METHOD_MAP[METHOD_NUM] = start
+
+def trace_call(method):
+    global CURRENT_METHOD
+    global METHOD_NUM_STACK
+    global METHOD_MAP
+    global METHOD_NUM
+    METHOD_NUM += 1
+
+    # create our method invocation
+    # method_num, method_name, children
+    n = (METHOD_NUM, method, [])
+    METHOD_MAP[METHOD_NUM] = n
+    # add ourselves as one of the children to the previous method invocation
+    METHOD_NUM_STACK[-1][2].append(n)
+    # and set us as the current method.
+    METHOD_NUM_STACK.append(n)
+
+def trace_return():
+    METHOD_NUM_STACK.pop()
+
+def trace_set_method(method):
+    set_current_method(method, len(METHOD_NUM_STACK), METHOD_NUM_STACK[-1][0])
 
 class xtstr(ctstr):
     def add_instr(self, op, c_a, c_b):
@@ -45,15 +84,13 @@ class Tracer:
     def __call__(self): return self.inputstr
 
     def __init__(self, inputstr, restrict={}):
+        global METHOD_NUM
         self.inputstr = xtstr(inputstr, parent=None).with_comparisons([])
         self.trace = []
         self.restrict = restrict
 
-        self.method_num = 0
+        trace_init()
         # method_num, method_name, children
-        start = (self.method_num, None, [])
-        self.method_num_stack = [start]
-        self.method_map = {self.method_num: start}
 
     def tracing_context(self, cxt, event, arg):
         if self.restrict.get('files'):
@@ -68,28 +105,19 @@ class Tracer:
         self.on_event(event, arg, cxt)
         return self.trace_event
 
+    @property
+    def method_map(self):
+        return METHOD_MAP
+
     def on_event(self, event, arg, cxt):
+        global METHOD_NUM
         # make it tree
         self.trace.append((event, cxt))
         if event == 'call':
-            self.method_num += 1
-
-            # create our method invocation
-            # method_num, method_name, children
-            n = (self.method_num, cxt.method, [])
-            self.method_map[self.method_num] = n
-
-            # add ourselves as one of the children to the previous method invocation
-            self.method_num_stack[-1][2].append(n)
-
-            # and set us as the current method.
-            self.method_num_stack.append(n)
+            trace_call(cxt.method)
         elif event == 'return':
-            self.method_num_stack.pop()
-        current_minfo = self.method_num_stack[-1] # current
-        current_mid = current_minfo[0]
-        set_current_method(cxt.method, len(self.method_num_stack), current_mid)
-
+            trace_return()
+        trace_set_method(cxt.method)
 
 def convert_comparisons(comparisons):
     light_comparisons = []
