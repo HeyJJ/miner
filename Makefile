@@ -18,12 +18,13 @@ T_MINE=$(addsuffix .mine,$(PROJECTS))
 
 ARG='a=1'
 
-all: mine_calc_parse
+#all: mine_calc_parse; @echo all
+all: calc_parse_mine; @echo all
 
+EARG='(25-1/(2+3))*100/3'
 %_call_trace.json: src/%_parse.py
-	python3 ./src/$*_parse.py $(ARG) > _$@
+	python3 ./src/$*_parse.py $(EARG) > _$@
 	mv _$@ $@
-	#python3 ./src/calc_parse.py $(ARG)
 
 %_mine: %_call_trace.json
 	python3 ./src/mine.py $<
@@ -31,13 +32,10 @@ all: mine_calc_parse
 clean:
 	rm -rf *.json build
 
-%_mine: %_call_trace.json
-	python3 ./src/mine.py $<
-
 ## ----  DECOMPILE ---
 DECOMPILER=$(HOME)/Research/dagger/build/bin/llvm-dec
 
-decompile_%: build/.%.decompiled; @echo done
+decompile_%: build/.%.decompiled; @echo decompile
 build/.%.decompiled: build/.%.original
 	$(DECOMPILER) build/$*/original > build/$*/decompiled.ll
 	touch $@
@@ -53,27 +51,27 @@ TRACEPLUGIN=$(CHECKSUM_REPAIR)/build/debug/modules/trace-instr/libtraceplugin.dy
 EXCLUDED_FUNCTIONS=$(CHECKSUM_REPAIR)/samples/excluded_functions
 
 ## ----  COMPILE ---
-original_%: build/.%.original; @echo done
+original_%: build/.%.original; @echo original
 build/.%.original: subjects/%.c | build
 	mkdir -p build/$*
 	$(CLANG) -g -D_FORTIFY_SOURCE=0 -o build/$*/original -x c $< -ldl
 	touch $@
 
 ## ---- GEN UNINSTRUMETED BITCODE -----
-ull_%: build/.%.uninstrumentedll; @echo done
+ull_%: build/.%.uninstrumentedll; @echo ull
 build/.%.uninstrumentedll: subjects/%.c | build
 	mkdir -p build/$*
 	$(CLANG) -g -S -D_FORTIFY_SOURCE=0 -emit-llvm -include $(INCDIR)/traceinstr/wrapper_libc.h -o build/$*/uninstrumented.ll -x c $<
 	touch $@
 
-metadata%: build/.%.metadata; @echo done
+metadata%: build/.%.metadata; @echo metadata
 build/.%.metadata: build/.%.uninstrumentedll
 	# extract metadata for taint analysis
 	$(CHECKSUM_REPAIR)/install/bin/extract_metadata -ef $(EXCLUDED_FUNCTIONS) -f build/$*/uninstrumented.ll
 	touch $@
 
 ## ---- INSTRUMENT BITCODE-----
-instrument_%: build/.%.instrumented; @echo done
+instrument_%: build/.%.instrumented; @echo instrument
 build/.%.instrumented: build/.%.metadata build/.%.uninstrumentedll | build
 	$(LLVM) -S -instnamer -reg2mem -load $(TRACEPLUGIN) -traceplugin -exclude_functions $(EXCLUDED_FUNCTIONS) -disable-verify build/$*/uninstrumented.ll -o  build/$*/opt_debug.ll
 	$(LLVM) -S -strip-debug build/$*/opt_debug.ll -o build/$*/debug.ll
@@ -82,7 +80,7 @@ build/.%.instrumented: build/.%.metadata build/.%.uninstrumentedll | build
 
 ## ---- RUN -----
 
-run_%: build/.%.run; @echo done
+run_%: build/.%.run; @echo run
 build/.%.run: build/.%.instrumented
 	echo $(INPUTSTR) | ./build/$*.instrumented
 	mv output build/$*/output
@@ -91,13 +89,13 @@ build/.%.run: build/.%.instrumented
 
 ## ---- OFFLINE TAINT ANALYSIS ---
 
-taint_%: build/.%.taint; @echo done
+taint_%: build/.%.taint; @echo taint
 build/.%.taint: build/.%.run
 	$(java) -cp "$(CHECKSUM_REPAIR)/install/lib/java/*" main.TaintTracker -me build/calc_parse/metadata -po build/$*.pygmalion.json -t build/$*/output.gz
 	touch $@
 
 ## ---- OFFLINE CALL TRACE ---
-trace_%: build/.%.trace; @echo done
+trace_%: build/.%.trace; @echo trace
 build/.%.trace: build/.%.taint
 	cat build/$*.pygmalion.json \
 		| grep -v '"operator":"tokenstore"' \
@@ -109,7 +107,7 @@ build/.%.trace: build/.%.taint
 
 ## ---- MINE GRAMMAR ---
 
-mine_%: build/.%.mine; @echo done
+mine_%: build/.%.mine; @echo mine
 build/.%.mine: build/.%.trace
 	python3 ./src/mine.py build/$*/call_trace.json
 	touch $@

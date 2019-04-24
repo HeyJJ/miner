@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 def all_terminals(tree):
-    (symbol, children) = tree
+    (symbol, children, *_) = tree
     if children is None: return symbol
     if len(children) == 0: return symbol
     return ''.join([all_terminals(c) for c in children])

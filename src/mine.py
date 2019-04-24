@@ -76,7 +76,7 @@ def tree_to_string(tree):
 
 # convert a mapped tree to the fuzzingbook derivation tree.
 def to_tree(node, my_str):
-    method_name = node['name']
+    method_name = ("<%s>" % node['name']) if node['name'] is not None else '<START>'
     indexes = node['indexes']
     node_children = [to_tree(c, my_str) for c in node.get('children', [])]
     idx_children = indexes_to_children(indexes, my_str)

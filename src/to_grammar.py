@@ -11,9 +11,9 @@ def to_grammar(tree, grammar):
         if c[1] == []:
             tokens.append(c[0])
         else:
-            tokens.append("<%s>" % c[0])
+            tokens.append(c[0])
             to_grammar(c, grammar)
-    grammar[node].add(''.join(tokens))
+    grammar[node].add(tuple(tokens))
     return grammar
 
 
@@ -26,13 +26,17 @@ def merge_grammar(g1, g2):
     return merged
 
 def process(files):
+    start = set()
     final_grammar = {}
     for fn in files:
         with open(fn) as f:
             tree = json.load(f)[1][0]
+            start.add(tree[0])
         g = to_grammar(tree, {})
         final_grammar = merge_grammar(final_grammar, g)
-    return {k:[a for a in v] for k,v in final_grammar.items()}
+    assert len(start) == 1
+    return {k:list(v) for k,v in final_grammar.items()}
 
-g = process(sys.argv[1:])
-print(g)
+if __name__ == '__main__':
+    g = process(sys.argv[1:])
+    print(json.dumps(g))
