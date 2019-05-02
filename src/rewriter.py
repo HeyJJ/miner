@@ -35,9 +35,10 @@ class Rewriter(ast.NodeTransformer):
         if len(tree_node.orelse) == 1 and isinstance(tree_node.orelse[0], ast.If):
             self.process_if(tree_node.orelse[0], name, val)
         else:
-            for node in tree_node.orelse: self.generic_visit(node)
-            val += 1
-            tree_node.orelse = self.wrap_in_with(name, val, tree_node.orelse)
+            if tree_node.orelse:
+                for node in tree_node.orelse: self.generic_visit(node)
+                val += 1
+                tree_node.orelse = self.wrap_in_with(name, val, tree_node.orelse)
 
 
     def visit_If(self, tree_node):
